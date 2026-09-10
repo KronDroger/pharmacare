@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CarePlusPharmacy")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+54073160f55bdf6bc2a2f54c3f4b4bec03832ad8")]
 [assembly: System.Reflection.AssemblyProductAttribute("CarePlusPharmacy")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CarePlusPharmacy")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

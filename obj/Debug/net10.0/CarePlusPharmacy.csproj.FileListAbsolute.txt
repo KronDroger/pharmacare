@@ -170,3 +170,4 @@ C:\Users\USER\CarePlusPharmacy\CarePlusPharmacy\obj\Debug\net10.0\compressed\qpl
 C:\Users\USER\CarePlusPharmacy\CarePlusPharmacy\obj\Debug\net10.0\compressed\ibk3gjdxgc-{0}-32eqc97fd7-32eqc97fd7.gz
 C:\Users\USER\CarePlusPharmacy\CarePlusPharmacy\obj\Debug\net10.0\compressed\xuweaa6r5i-{0}-tmmlf3b617-tmmlf3b617.gz
 C:\Users\USER\CarePlusPharmacy\CarePlusPharmacy\obj\Debug\net10.0\compressed\58bz9z64v2-{0}-um1esdzbol-um1esdzbol.gz
+C:\Users\USER\CarePlusPharmacy\CarePlusPharmacy\obj\Debug\net10.0\CarePlusPharmacy.sourcelink.json
