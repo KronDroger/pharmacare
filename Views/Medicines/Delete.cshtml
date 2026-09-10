@@ -1,0 +1,17 @@
+@model Medicine
+@{
+    ViewData["Title"] = "Archive Medicine";
+}
+<div class="table-card p-4" style="max-width:520px;">
+    <h5 class="fw-bold mb-3" style="color: var(--cp-forest-deep);">
+        <i class="bi bi-archive text-danger me-2"></i>Archive Medicine
+    </h5>
+    <p class="mb-4">Are you sure you want to archive <strong>@Model.Name</strong>? This record will be archived from active dispensing inventory.</p>
+    <form asp-action="Delete" method="post">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger">
+            <i class="bi bi-archive me-1"></i> Archive
+        </button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>

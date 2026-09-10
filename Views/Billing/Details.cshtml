@@ -1,0 +1,139 @@
+@model Billing
+@{
+    ViewData["Title"] = $"Invoice {Model.InvoiceNumber}";
+    var vatRate = 0.12m;
+    var vatableSales = Model.AmountDue / (1 + vatRate);
+    var vatAmount = Model.AmountDue - vatableSales;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div>
+        <h4 class="fw-bold mb-0 text-dark">Official Pharmacy Tax Invoice</h4>
+        <div class="text-muted" style="font-size: 13px;">Invoice No: <strong class="font-monospace">@Model.InvoiceNumber</strong></div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-careplus" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i> Print Invoice
+        </button>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            Back to Invoices
+        </a>
+    </div>
+</div>
+
+<div class="invoice-wrapper" style="max-width: 800px; margin: 0 auto; background: #ffffff;">
+    <!-- Invoice Header -->
+    <div class="row align-items-center pb-4 mb-4 border-bottom">
+        <div class="col-sm-7">
+            <div class="d-flex align-items-center gap-3">
+                <img src="~/images/careplus-icon.svg" alt="CarePlus Logo" style="width: 54px; height: 54px;" />
+                <div>
+                    <h3 class="fw-bold mb-0 text-dark" style="letter-spacing: -0.5px;">CAREPLUS PHARMACY</h3>
+                    <div class="text-muted" style="font-size: 12px;">Integrated Healthcare &amp; Medical Supplies</div>
+                    <div class="text-muted" style="font-size: 11px;">Agdao District, Davao City, Philippines · (082) 299-CARE</div>
+                    <div class="text-muted" style="font-size: 11px;">VAT Reg. TIN: 450-892-104-000</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-5 text-sm-end mt-3 mt-sm-0">
+            <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 mb-2">
+                <i class="bi bi-check-circle-fill me-1"></i> @Model.PaymentStatus
+            </div>
+            <div class="fw-bold fs-5 text-dark font-monospace">@Model.InvoiceNumber</div>
+            <div class="text-muted" style="font-size: 12px;">Date: @Model.DateIssued.ToString("MMMM dd, yyyy")</div>
+            <div class="text-muted" style="font-size: 11px;">Ref: Sale Transaction #@Model.SaleId</div>
+        </div>
+    </div>
+
+    <!-- Bill To / Customer Information -->
+    <div class="row mb-4">
+        <div class="col-6">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 11px;">BILLED TO:</div>
+            <div class="fw-bold fs-6 text-dark">@(Model.Sale?.Customer?.FullName ?? "Walk-in Customer")</div>
+            @if (Model.Sale?.Customer != null)
+            {
+                <div class="text-muted" style="font-size: 12.5px;"><i class="bi bi-telephone me-1"></i>@Model.Sale.Customer.Phone</div>
+                <div class="text-muted" style="font-size: 12.5px;"><i class="bi bi-geo-alt me-1"></i>@(Model.Sale.Customer.Address ?? "Davao City")</div>
+                <div class="mt-1">
+                    <span class="badge bg-light text-dark border" style="font-size: 10.5px;">CRM Tier: @Model.Sale.Customer.Tier</span>
+                </div>
+            }
+        </div>
+        <div class="col-6 text-end">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 11px;">PAYMENT DETAILS:</div>
+            <div class="fw-semibold text-dark">Method: @Model.PaymentMethod</div>
+            <div class="text-muted" style="font-size: 12px;">Tendered: ₱@Model.AmountPaid.ToString("N2")</div>
+            <div class="text-muted" style="font-size: 12px;">Change: ₱@Model.ChangeAmount.ToString("N2")</div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th style="width: 50%;">MEDICINE / PHARMACEUTICAL ITEM</th>
+                    <th class="text-center" style="width: 12%;">QTY</th>
+                    <th class="text-end" style="width: 18%;">UNIT PRICE</th>
+                    <th class="text-end" style="width: 20%;">TOTAL AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Sale != null)
+                {
+                    @foreach (var item in Model.Sale.Details)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark">@item.Medicine?.Name</div>
+                                <div class="text-muted" style="font-size: 11px;">
+                                    Formula: @(item.Medicine?.GenericName ?? "Pharmaceutical Standard")
+                                </div>
+                            </td>
+                            <td class="text-center fw-semibold">@item.Quantity</td>
+                            <td class="text-end">₱@item.UnitPrice.ToString("N2")</td>
+                            <td class="text-end fw-bold">₱@item.LineTotal.ToString("N2")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Totals & Tax Calculation -->
+    <div class="row justify-content-end mb-4">
+        <div class="col-sm-6">
+            <div class="p-3 rounded bg-light border">
+                <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
+                    <span class="text-muted">12% VATable Sales:</span>
+                    <span>₱@vatableSales.ToString("N2")</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
+                    <span class="text-muted">Value Added Tax (12% VAT):</span>
+                    <span>₱@vatAmount.ToString("N2")</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2" style="font-size: 13px;">
+                    <span class="text-muted">VAT-Exempt Sales:</span>
+                    <span>₱0.00</span>
+                </div>
+                @if (Model.Sale?.DiscountAmount > 0)
+                {
+                    <div class="d-flex justify-content-between mb-2 text-success" style="font-size: 13px;">
+                        <span>CRM Points Discount:</span>
+                        <span>-₱@Model.Sale.DiscountAmount.ToString("N2")</span>
+                    </div>
+                }
+                <div class="d-flex justify-content-between fs-5 fw-bold border-top pt-2 text-dark">
+                    <span>TOTAL AMOUNT DUE:</span>
+                    <span class="text-success">₱@Model.AmountDue.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Note -->
+    <div class="border-top pt-3 text-center text-muted" style="font-size: 11px;">
+        <p class="mb-1">This document serves as an Official Sales Invoice for medicine dispensing. Retain this invoice for warranty and regulatory inquiries.</p>
+        <p class="mb-0">CarePlus Pharmacy · Ensuring Safe, Reliable Healthcare Since 2026</p>
+    </div>
+</div>

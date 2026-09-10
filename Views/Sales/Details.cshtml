@@ -1,0 +1,162 @@
+@model Sale
+@{
+    ViewData["Title"] = $"Receipt - Sale #{Model.Id}";
+    var vatRate = 0.12m;
+    var vatableSales = Model.TotalAmount / (1 + vatRate);
+    var vatAmount = Model.TotalAmount - vatableSales;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div>
+        <h4 class="fw-bold mb-1" style="color: var(--cp-forest-deep);"><i class="bi bi-receipt text-success me-2"></i>Official Pharmacy Sales Receipt</h4>
+        <div class="text-muted" style="font-size: 13px;">Transaction record &amp; customer billing proof</div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-careplus" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i> Print Receipt
+        </button>
+        <a asp-action="Create" class="btn btn-accent">
+            <i class="bi bi-cart-plus me-1"></i> New POS Sale
+        </a>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            Back to Sales
+        </a>
+    </div>
+</div>
+
+<!-- Receipt Presentation Card -->
+<div class="receipt-wrapper">
+    <!-- Header with CarePlus Logo -->
+    <div class="text-center mb-3">
+        <img src="~/images/careplus-icon.svg" alt="CarePlus Logo" style="width: 44px; height: 44px; margin-bottom: 6px;" />
+        <div class="fw-bold fs-5 text-dark" style="letter-spacing: -0.5px;">CAREPLUS PHARMACY</div>
+        <div style="font-size: 11px;" class="text-muted">RETAIL PHARMACY &amp; MEDICAL SUPPLIES</div>
+        <div style="font-size: 10.5px;" class="text-muted">Agdao District, Davao City · Tel: (082) 299-CARE</div>
+        <div style="font-size: 10.5px;" class="text-muted">VAT Reg. TIN: 450-892-104-000</div>
+    </div>
+
+    <div class="border-top border-bottom py-2 my-2" style="font-size: 11.5px;">
+        <div class="d-flex justify-content-between">
+            <span>Invoice No:</span>
+            <strong>@(Model.Billing?.InvoiceNumber ?? $"INV-{Model.Id:D5}")</strong>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Transaction ID:</span>
+            <span>#@Model.Id</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Date &amp; Time:</span>
+            <span>@Model.SaleDate.ToString("yyyy-MM-dd HH:mm")</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Cashier / Staff:</span>
+            <span>@(Model.Cashier?.FullName ?? Model.Cashier?.UserName ?? "Staff")</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Customer:</span>
+            <strong>@(Model.Customer?.FullName ?? "Walk-in Customer")</strong>
+        </div>
+        @if (Model.Customer != null)
+        {
+            <div class="d-flex justify-content-between text-success">
+                <span>Loyalty Tier:</span>
+                <span>@Model.Customer.Tier</span>
+            </div>
+        }
+    </div>
+
+    <!-- Line Items -->
+    <table class="w-100 my-2" style="font-size: 12px; border-collapse: collapse;">
+        <thead>
+            <tr class="border-bottom text-muted" style="font-size: 11px;">
+                <th class="py-1 text-start">ITEM / BATCH</th>
+                <th class="py-1 text-center">QTY</th>
+                <th class="py-1 text-end">PRICE</th>
+                <th class="py-1 text-end">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var d in Model.Details)
+            {
+                <tr class="border-bottom border-light">
+                    <td class="py-1">
+                        <div class="fw-bold">@d.Medicine?.Name</div>
+                        <div class="text-muted" style="font-size: 10px;">
+                            Batch: @(d.Batch?.BatchNumber ?? "FIFO-Auto")
+                        </div>
+                    </td>
+                    <td class="py-1 text-center">@d.Quantity</td>
+                    <td class="py-1 text-end">₱@d.UnitPrice.ToString("N2")</td>
+                    <td class="py-1 text-end fw-bold">₱@d.LineTotal.ToString("N2")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <!-- Totals & Breakdown -->
+    <div class="border-top pt-2 mt-2" style="font-size: 12px;">
+        <div class="d-flex justify-content-between mb-1">
+            <span>Gross Total:</span>
+            <span>₱@Model.GrossAmount.ToString("N2")</span>
+        </div>
+        @if (Model.DiscountAmount > 0)
+        {
+            <div class="d-flex justify-content-between mb-1 text-success">
+                <span>CRM Points Discount:</span>
+                <span>-₱@Model.DiscountAmount.ToString("N2")</span>
+            </div>
+        }
+        <div class="d-flex justify-content-between fs-6 fw-bold border-top pt-1 text-dark">
+            <span>TOTAL AMOUNT DUE:</span>
+            <span class="text-success">₱@Model.TotalAmount.ToString("N2")</span>
+        </div>
+
+        <div class="d-flex justify-content-between mt-2 pt-2 border-top text-muted" style="font-size: 11px;">
+            <span>Payment Method:</span>
+            <span class="fw-bold text-dark">@Model.PaymentMethod</span>
+        </div>
+        @if (Model.Billing != null)
+        {
+            <div class="d-flex justify-content-between text-muted" style="font-size: 11px;">
+                <span>Amount Tendered:</span>
+                <span>₱@Model.Billing.AmountPaid.ToString("N2")</span>
+            </div>
+            <div class="d-flex justify-content-between text-muted" style="font-size: 11px;">
+                <span>Change Given:</span>
+                <span class="fw-bold text-dark">₱@Model.Billing.ChangeAmount.ToString("N2")</span>
+            </div>
+        }
+
+        <!-- Tax Breakdown -->
+        <div class="border-top pt-2 mt-2 text-muted" style="font-size: 10.5px;">
+            <div class="d-flex justify-content-between">
+                <span>12% VATable Sales:</span>
+                <span>₱@vatableSales.ToString("N2")</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>12% VAT Amount:</span>
+                <span>₱@vatAmount.ToString("N2")</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>VAT-Exempt:</span>
+                <span>₱0.00</span>
+            </div>
+        </div>
+
+        @if (Model.Customer != null)
+        {
+            <div class="border-top pt-2 mt-2 p-2 rounded text-center" style="background: var(--cp-mint-subtle); font-size: 11px;">
+                <div><i class="bi bi-gift-fill text-success me-1"></i> CarePlus CRM Rewards</div>
+                <div>Points Earned This Sale: <strong>+@Model.PointsEarned pts</strong></div>
+                <div>Current Total Balance: <strong>@Model.Customer.LoyaltyPoints pts</strong></div>
+            </div>
+        }
+    </div>
+
+    <!-- Barcode & Footer -->
+    <div class="text-center mt-3 pt-2 border-top">
+        <div class="barcode-font fw-bold" style="letter-spacing: 4px; font-size: 16px;">*INV@Model.Id.ToString("D5")*</div>
+        <div style="font-size: 10px;" class="text-muted mt-1">THANK YOU FOR CHOOSING CAREPLUS!</div>
+        <div style="font-size: 9.5px;" class="text-muted">Medicines sold with approved FDA certificates. Keep receipt for returns within 7 days.</div>
+    </div>
+</div>

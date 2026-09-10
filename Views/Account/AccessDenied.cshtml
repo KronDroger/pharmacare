@@ -1,0 +1,11 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+<div class="auth-card text-center">
+    <i class="bi bi-shield-lock" style="font-size:34px;color:#c33636;"></i>
+    <h4 class="fw-bold mt-3">Access denied</h4>
+    <p class="text-muted" style="font-size:13.5px;">
+        Your account role doesn't have permission to view that page.
+    </p>
+    <a asp-controller="Home" asp-action="Index" class="btn btn-accent">Back to dashboard</a>
+</div>

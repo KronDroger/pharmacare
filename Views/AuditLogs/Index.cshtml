@@ -1,0 +1,90 @@
+@model List<CarePlusPharmacy.Models.AuditLog>
+@{
+    ViewData["Title"] = "System Logs & Audit Trails";
+    var modules = ViewBag.Modules as List<string> ?? new();
+}
+
+<div class="table-card">
+    <div class="table-card-header flex-wrap gap-2">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-shield-check text-success me-2"></i>Security &amp; Operational Audit Trails</div>
+            <div class="text-muted" style="font-size: 12px;">Immutable activity log for regulatory pharmacy compliance, inventory movements, and dispensing verification</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <form method="get" class="d-flex gap-2">
+                <select name="module" class="form-select form-select-sm" style="width: 170px;" onchange="this.form.submit()">
+                    <option value="">All Modules</option>
+                    @foreach (var mod in modules)
+                    {
+                        <option value="@mod" selected="@(mod == ViewBag.Module)">@mod</option>
+                    }
+                </select>
+                <div class="input-group input-group-sm" style="width: 220px;">
+                    <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="Search log text..." />
+                    <button class="btn btn-outline-secondary" type="submit">Filter</button>
+                </div>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+                <i class="bi bi-printer"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Staff / User</th>
+                    <th>Role</th>
+                    <th>Module</th>
+                    <th>Action</th>
+                    <th>Activity Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-5">
+                            <i class="bi bi-shield-slash fs-2 d-block mb-2 text-muted"></i>
+                            No audit trail events found matching the criteria.
+                        </td>
+                    </tr>
+                }
+                @foreach (var log in Model)
+                {
+                    <tr>
+                        <td style="white-space: nowrap;">
+                            <div class="fw-semibold text-dark">@log.Timestamp.ToString("yyyy-MM-dd")</div>
+                            <div class="text-muted" style="font-size: 11px;">@log.Timestamp.ToString("hh:mm:ss tt")</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">@log.UserName</div>
+                            @if (!string.IsNullOrEmpty(log.IpAddress))
+                            {
+                                <div class="text-muted" style="font-size: 10px;">IP: @log.IpAddress</div>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border" style="font-size: 10.5px;">@log.UserRole</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 11px;">
+                                @log.Module
+                            </span>
+                        </td>
+                        <td>
+                            <span class="font-monospace fw-bold text-dark" style="font-size: 12px;">@log.Action</span>
+                        </td>
+                        <td>
+                            <div style="font-size: 12.5px; color: #334155; max-width: 450px;">
+                                @log.Details
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

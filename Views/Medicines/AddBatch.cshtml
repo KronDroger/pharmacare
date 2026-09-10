@@ -1,0 +1,17 @@
+@model MedicineBatch
+@{
+    ViewData["Title"] = "Add Stock Batch";
+    var medicine = (Medicine)ViewBag.Medicine;
+}
+<div class="table-card p-4" style="max-width:520px;">
+    <h6 class="fw-bold mb-3">Add batch — @medicine.Name</h6>
+    <form asp-action="AddBatch" method="post">
+        <input type="hidden" asp-for="MedicineId" />
+        <div class="mb-3"><label class="form-label">Batch number</label><input asp-for="BatchNumber" class="form-control" required /></div>
+        <div class="mb-3"><label class="form-label">Quantity</label><input asp-for="Quantity" type="number" min="1" class="form-control" required /></div>
+        <div class="mb-3"><label class="form-label">Expiry date</label><input asp-for="ExpiryDate" type="date" class="form-control" required /></div>
+        <div class="mb-3"><label class="form-label">Date received</label><input asp-for="DateReceived" type="date" class="form-control" /></div>
+        <button type="submit" class="btn btn-accent">Add Batch</button>
+        <a asp-action="Details" asp-route-id="@medicine.Id" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>

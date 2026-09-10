@@ -1,0 +1,121 @@
+@model List<Customer>
+@{
+    ViewData["Title"] = "Customer Management & Directory";
+    bool canEdit = ViewBag.CanEdit;
+}
+
+<div class="table-card">
+    <div class="table-card-header flex-wrap gap-2">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-people-fill text-success me-2"></i>Patient &amp; Customer Directory</div>
+            <div class="text-muted" style="font-size: 12px;">Profiles, CRM loyalty points balances, contact information, and lifetime order histories</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <form method="get" class="d-flex">
+                <div class="input-group input-group-sm" style="width: 240px;">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="Search patient name..." />
+                    <button class="btn btn-outline-secondary" type="submit">Search</button>
+                </div>
+            </form>
+            @if (canEdit)
+            {
+                <a asp-action="Create" class="btn btn-sm btn-careplus d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-person-plus-fill"></i> Add Customer
+                </a>
+            }
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Patient / Full Name</th>
+                    <th>CRM Tier</th>
+                    <th>Loyalty Points</th>
+                    <th>Contact Phone</th>
+                    <th>Email Address</th>
+                    <th>Lifetime Spend</th>
+                    <th>Orders</th>
+                    @if (canEdit)
+                    {
+                        <th class="text-end">Actions</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-person-x fs-2 d-block mb-2 text-muted"></i>
+                            No customer records found.
+                        </td>
+                    </tr>
+                }
+                @foreach (var c in Model)
+                {
+                    var totalSpent = c.Sales.Sum(s => s.TotalAmount);
+                    <tr>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@c.Id" class="fw-bold text-dark text-decoration-none">
+                                @c.FullName
+                            </a>
+                            <div class="text-muted" style="font-size: 11px;">Registered: @c.DateRegistered.ToString("yyyy-MM-dd")</div>
+                        </td>
+                        <td>
+                            @if (c.LoyaltyPoints >= 500)
+                            {
+                                <span class="badge-tier-platinum">@c.Tier</span>
+                            }
+                            else if (c.LoyaltyPoints >= 250)
+                            {
+                                <span class="badge-tier-gold">@c.Tier</span>
+                            }
+                            else if (c.LoyaltyPoints >= 100)
+                            {
+                                <span class="badge-tier-silver">@c.Tier</span>
+                            }
+                            else
+                            {
+                                <span class="badge-tier-bronze">@c.Tier</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="fw-bold text-success fs-6">@c.LoyaltyPoints pts</span>
+                        </td>
+                        <td>
+                            <a href="tel:@c.Phone" class="text-decoration-none text-dark">
+                                <i class="bi bi-telephone text-muted me-1"></i>@c.Phone
+                            </a>
+                        </td>
+                        <td>
+                            <span class="text-muted" style="font-size: 12.5px;">@(c.Email ?? "—")</span>
+                        </td>
+                        <td>
+                            <span class="fw-bold text-dark">₱@totalSpent.ToString("N2")</span>
+                        </td>
+                        <td>
+                            <span class="text-muted fw-semibold">@c.Sales.Count order(s)</span>
+                        </td>
+                        @if (canEdit)
+                        {
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@c.Id" class="btn btn-sm btn-outline-careplus py-1 px-2 me-2" style="font-size: 12px;">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </a>
+                                <a asp-action="Edit" asp-route-id="@c.Id" class="action-icon text-secondary me-2" title="Edit Customer">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@c.Id" class="action-icon text-danger" title="Archive Customer">
+                                    <i class="bi bi-archive"></i>
+                                </a>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

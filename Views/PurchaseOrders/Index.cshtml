@@ -1,0 +1,47 @@
+@model List<PurchaseOrder>
+@{ ViewData["Title"] = "Purchasing"; }
+
+<div class="d-flex justify-content-end mb-3">
+    <a asp-action="Create" class="btn btn-accent"><i class="bi bi-plus-lg"></i> New Purchase Order</a>
+</div>
+
+<div class="table-card">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>PO ID</th><th>Date</th><th>Supplier</th><th>Item</th><th>Qty</th><th>Cost/unit</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+            @if (!Model.Any()) { <tr><td colspan="9" class="text-center text-muted py-4">No purchase orders yet.</td></tr> }
+            @foreach (var po in Model)
+            {
+                var item = po.Details.FirstOrDefault();
+                <tr>
+                    <td>#@po.Id</td>
+                    <td>@po.OrderDate.ToString("yyyy-MM-dd")</td>
+                    <td>@(po.Supplier?.Name ?? "—")</td>
+                    <td>@(item?.Medicine?.Name ?? "—")</td>
+                    <td>@(item?.Quantity ?? 0)</td>
+                    <td>₱@((item?.UnitCost ?? 0).ToString("N2"))</td>
+                    <td class="fw-bold">₱@po.TotalCost.ToString("N2")</td>
+                    <td>
+                        @if (po.Status == PurchaseOrderStatus.Received) { <span class="badge text-bg-success">Received</span> }
+                        else if (po.Status == PurchaseOrderStatus.Cancelled) { <span class="badge text-bg-secondary">Cancelled</span> }
+                        else { <span class="badge text-bg-warning">Pending</span> }
+                    </td>
+                    <td>
+                        @if (po.Status == PurchaseOrderStatus.Pending)
+                        {
+                            <form asp-action="MarkReceived" asp-route-id="@po.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-accent">Mark Received</button>
+                            </form>
+                            <form asp-action="Cancel" asp-route-id="@po.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Cancel</button>
+                            </form>
+                        }
+                        <form asp-action="Delete" asp-route-id="@po.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this purchase order?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

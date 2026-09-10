@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "Log Physician Prescription";
+    var customers = (List<CarePlusPharmacy.Models.Customer>)ViewBag.Customers;
+    var medicines = (List<CarePlusPharmacy.Models.Medicine>)ViewBag.Medicines;
+}
+
+<div class="table-card p-4" style="max-width: 600px;">
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+        <i class="bi bi-file-earmark-medical fs-4 text-success"></i>
+        <div>
+            <h5 class="fw-bold mb-0 text-dark">Record Physician Prescription</h5>
+            <div class="text-muted" style="font-size: 12px;">Link prescription details to patient profile for dispensing verification</div>
+        </div>
+    </div>
+
+    <form asp-action="Create" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size: 13px;">Patient / Customer *</label>
+            <select name="customerId" class="form-select" required>
+                <option value="">-- Select Registered Patient --</option>
+                @foreach (var c in customers)
+                {
+                    <option value="@c.Id">@c.FullName (@c.Phone) - @c.Tier</option>
+                }
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="col-md-7 mb-3">
+                <label class="form-label fw-semibold" style="font-size: 13px;">Prescribing Physician *</label>
+                <input name="doctorName" class="form-control" placeholder="e.g. Dr. Rafael Mendoza, MD" required />
+            </div>
+            <div class="col-md-5 mb-3">
+                <label class="form-label fw-semibold" style="font-size: 13px;">Date Prescribed *</label>
+                <input name="datePrescribed" type="date" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8 mb-3">
+                <label class="form-label fw-semibold" style="font-size: 13px;">Prescribed Medicine *</label>
+                <select name="medicineId" class="form-select" required>
+                    <option value="">-- Select Medicine --</option>
+                    @foreach (var m in medicines)
+                    {
+                        <option value="@m.Id">@m.Name (@m.GenericName) - ₱@m.UnitPrice.ToString("N2")</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label fw-semibold" style="font-size: 13px;">Quantity *</label>
+                <input name="quantity" type="number" min="1" class="form-control" placeholder="e.g. 30" required />
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label fw-semibold" style="font-size: 13px;">Dosage Instructions &amp; Regimen</label>
+            <textarea name="dosage" class="form-control" rows="2" placeholder="e.g. Take 1 tablet once daily every morning with a full glass of water for 30 days."></textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-careplus px-4">Record Prescription</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>

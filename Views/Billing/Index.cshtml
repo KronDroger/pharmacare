@@ -1,0 +1,138 @@
+@model List<Billing>
+@{
+    ViewData["Title"] = "Billing & Official Invoices";
+    var totalBilled = Model.Sum(b => b.AmountDue);
+    var totalPaid = Model.Where(b => b.PaymentStatus == PaymentStatus.Paid).Sum(b => b.AmountDue);
+}
+
+<!-- Billing KPI Summary -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="stat-card">
+        <div class="stat-icon icon-dark">
+            <i class="bi bi-receipt-cutoff"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Total Invoiced Amount</div>
+            <div class="stat-value">₱@totalBilled.ToString("N2")</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-success fw-bold">+22%</span> vs last month
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon icon-green">
+            <i class="bi bi-cash-stack"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Collected Payments</div>
+            <div class="stat-value text-success">₱@totalPaid.ToString("N2")</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-success fw-bold">Settled</span> via Cash / Card
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon icon-blue">
+            <i class="bi bi-file-earmark-check"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Total Invoices Issued</div>
+            <div class="stat-value">@Model.Count</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-primary fw-bold">100%</span> officially recorded
+        </div>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-receipt text-success me-2"></i>Official Pharmacy Invoicing Ledger</div>
+            <div class="text-muted" style="font-size: 12px;">Auto-generated financial records linked to POS transactions with tax breakdown</div>
+        </div>
+        <a asp-controller="Sales" asp-action="Create" class="btn btn-sm btn-careplus">
+            <i class="bi bi-cart3 me-1"></i> New POS Transaction
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Date Issued</th>
+                    <th>Customer / Patient</th>
+                    <th>Payment Method</th>
+                    <th>Amount Due</th>
+                    <th>Amount Paid</th>
+                    <th>Change</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-5">
+                            <i class="bi bi-receipt fs-2 d-block mb-2 text-muted"></i>
+                            No invoices generated yet.
+                        </td>
+                    </tr>
+                }
+                @foreach (var b in Model)
+                {
+                    <tr>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@b.Id" class="fw-bold text-dark font-monospace text-decoration-none">
+                                @b.InvoiceNumber
+                            </a>
+                            <div class="text-muted" style="font-size: 11px;">Sale ID #@b.SaleId</div>
+                        </td>
+                        <td>@b.DateIssued.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <span class="fw-semibold text-dark">@(b.Sale?.Customer?.FullName ?? "Walk-in Customer")</span>
+                        </td>
+                        <td>
+                            <span class="text-muted fw-semibold">@b.PaymentMethod</span>
+                        </td>
+                        <td>
+                            <span class="fw-bold text-dark fs-6">₱@b.AmountDue.ToString("N2")</span>
+                        </td>
+                        <td>₱@b.AmountPaid.ToString("N2")</td>
+                        <td>
+                            @if (b.ChangeAmount > 0)
+                            {
+                                <span class="text-muted" style="font-size: 12px;">₱@b.ChangeAmount.ToString("N2")</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted" style="font-size: 12px;">₱0.00</span>
+                            }
+                        </td>
+                        <td>
+                            @if (b.PaymentStatus == PaymentStatus.Paid)
+                            {
+                                <span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>Paid</span>
+                            }
+                            else if (b.PaymentStatus == PaymentStatus.Refunded)
+                            {
+                                <span class="text-secondary fw-semibold">Refunded</span>
+                            }
+                            else
+                            {
+                                <span class="text-warning fw-semibold">Unpaid</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a asp-action="Details" asp-route-id="@b.Id" class="btn btn-sm btn-outline-careplus py-1 px-2" style="font-size: 12px;">
+                                <i class="bi bi-printer me-1"></i> Invoice View
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

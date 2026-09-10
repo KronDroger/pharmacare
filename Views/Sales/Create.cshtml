@@ -1,0 +1,480 @@
+@{
+    ViewData["Title"] = "POS Terminal";
+    var customers = ViewBag.Customers as List<CarePlusPharmacy.Models.Customer> ?? new();
+    var medicines = ViewBag.Medicines as List<CarePlusPharmacy.Models.Medicine> ?? new();
+    var rx = ViewBag.Prescription as CarePlusPharmacy.Models.Prescription;
+}
+
+@if (rx != null)
+{
+    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center justify-content-between mb-3" style="background:#e0f2fe; border-radius: 12px;">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark-medical-fill fs-4 text-primary"></i>
+            <div>
+                <strong>Dispensing Prescription #@rx.Id</strong> for patient <strong>@rx.Customer?.FullName</strong> (Dr. @rx.DoctorName)
+                <div style="font-size: 12px;" class="text-muted">Prescription items have been pre-loaded into your active cart below.</div>
+            </div>
+        </div>
+        <span class="badge bg-primary">Prescription Linked</span>
+    </div>
+}
+
+<div class="pos-container">
+    <!-- Left Column: Medicine Catalog & Quick Search -->
+    <div>
+        <div class="card border-0 shadow-sm mb-3" style="border-radius: var(--radius-lg);">
+            <div class="card-body p-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-7">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="medSearch" class="form-control border-start-0 ps-0" placeholder="Search by Brand name, Generic name, or Manufacturer..." oninput="filterMeds()" />
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <select id="catFilter" class="form-select" onchange="filterMeds()">
+                            <option value="">All Categories</option>
+                            @foreach (var cat in medicines.Select(m => m.Category).Distinct().OrderBy(c => c))
+                            {
+                                <option value="@cat">@cat</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Medicine Grid -->
+        <div class="row g-3" id="medGrid">
+            @foreach (var med in medicines)
+            {
+                var isOutOfStock = med.TotalStock <= 0;
+                var isLowStock = !isOutOfStock && med.TotalStock <= med.ReorderLevel;
+                var nearestExp = med.NearestExpiry;
+                var isNearExp = nearestExp.HasValue && nearestExp.Value <= DateTime.Today.AddDays(45);
+
+                <div class="col-md-6 col-xl-4 med-card-wrapper" 
+                     data-name="@med.Name.ToLower()" 
+                     data-generic="@(med.GenericName?.ToLower() ?? "")" 
+                     data-cat="@med.Category.ToLower()"
+                     data-mfr="@(med.Manufacturer?.ToLower() ?? "")">
+                    <div class="card h-100 border-0 shadow-sm p-3 d-flex flex-column justify-content-between" 
+                         style="border-radius: var(--radius-md); transition: all 0.18s; border: 1px solid var(--cp-border);">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span class="badge bg-light text-muted border text-truncate" style="font-size: 10.5px; max-width: 140px;">
+                                    @med.Category
+                                </span>
+                                @if (isOutOfStock)
+                                {
+                                    <span class="badge bg-danger">Out of Stock</span>
+                                }
+                                else if (isLowStock)
+                                {
+                                    <span class="badge bg-warning text-dark">Low: @med.TotalStock</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Stock: @med.TotalStock</span>
+                                }
+                            </div>
+
+                            <div class="fw-bold fs-6 text-dark text-truncate" title="@med.Name">@med.Name</div>
+                            <div class="text-muted text-truncate" style="font-size: 12px;" title="@med.GenericName">
+                                <i class="bi bi-capsule me-1"></i>@(string.IsNullOrEmpty(med.GenericName) ? "Standard Formula" : med.GenericName)
+                            </div>
+                            @if (!string.IsNullOrEmpty(med.Manufacturer))
+                            {
+                                <div class="text-muted" style="font-size: 11px;">
+                                    <i class="bi bi-building me-1"></i>@med.Manufacturer
+                                </div>
+                            }
+
+                            @if (nearestExp.HasValue)
+                            {
+                                <div class="mt-1" style="font-size: 11px;">
+                                    Exp: <span class="@(isNearExp ? "text-danger fw-bold" : "text-muted")">@nearestExp.Value.ToString("MMM yyyy")</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <span class="fw-bold fs-5 text-success">₱@med.UnitPrice.ToString("N2")</span>
+                            <button type="button" 
+                                    class="btn btn-sm @(isOutOfStock ? "btn-secondary" : "btn-careplus") px-3" 
+                                    @(isOutOfStock ? "disabled" : "")
+                                    onclick="addToCart(@med.Id, '@med.Name.Replace("'", "\\'")', @med.UnitPrice, @med.TotalStock)">
+                                <i class="bi bi-plus-lg me-1"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Right Column: Active Cart & Checkout Panel -->
+    <div class="pos-cart-panel">
+        <div class="pos-cart-header">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold fs-6 text-dark"><i class="bi bi-cart3 text-success me-2"></i>Active Cart</span>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 11px;" onclick="clearCart()">
+                    Clear All
+                </button>
+            </div>
+
+            <!-- Customer / CRM Select -->
+            <label class="form-label mb-1 text-muted" style="font-size: 11.5px; font-weight: 600;">CUSTOMER / PATIENT</label>
+            <select id="customerSelect" class="form-select form-select-sm" onchange="onCustomerChange()">
+                <option value="" data-points="0" data-tier="None">Walk-in Customer (No CRM)</option>
+                @foreach (var c in customers)
+                {
+                    var selected = rx != null && rx.CustomerId == c.Id ? "selected" : "";
+                    <option value="@c.Id" data-points="@c.LoyaltyPoints" data-tier="@c.Tier" selected="@(rx != null && rx.CustomerId == c.Id)">
+                        @c.FullName (@c.Tier - @c.LoyaltyPoints pts)
+                    </option>
+                }
+            </select>
+
+            <!-- Customer Loyalty Card Preview -->
+            <div id="crmCustomerCard" class="mt-2 p-2 rounded d-none" style="background: var(--cp-mint-subtle); border: 1px solid rgba(16, 185, 129, 0.3);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span id="crmTierBadge" class="badge-tier-silver">Silver</span>
+                        <span class="text-dark fw-bold ms-1" style="font-size: 12px;"><span id="crmPointsAvailable">0</span> pts</span>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="usePointsSwitch" onchange="updateSummary()" />
+                        <label class="form-check-label" for="usePointsSwitch" style="font-size: 11.5px; font-weight: 600;">Redeem Pts</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart Items List -->
+        <div class="pos-cart-body" id="cartItemsContainer">
+            <div class="text-center py-5 text-muted" id="emptyCartMsg">
+                <i class="bi bi-bag-x fs-1 d-block mb-2 text-muted opacity-50"></i>
+                <div>Cart is empty</div>
+                <div style="font-size: 12px;">Select medicines on the left to add</div>
+            </div>
+            <div id="cartList"></div>
+        </div>
+
+        <!-- Cart Summary & Payment -->
+        <div class="pos-cart-footer">
+            <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
+                <span class="text-muted">Subtotal:</span>
+                <span class="fw-semibold text-dark">₱<span id="subtotalDisplay">0.00</span></span>
+            </div>
+            <div class="d-flex justify-content-between mb-1 text-success d-none" id="discountRow" style="font-size: 13px;">
+                <span>Points Discount:</span>
+                <span>-₱<span id="discountDisplay">0.00</span></span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3 pt-2 border-top">
+                <span class="fw-bold fs-6">Net Payable:</span>
+                <span class="fw-bold fs-4 text-success">₱<span id="netTotalDisplay">0.00</span></span>
+            </div>
+
+            <!-- Payment Method Select -->
+            <div class="mb-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">PAYMENT METHOD</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="payMethod" id="payCash" value="Cash" checked onchange="onPaymentMethodChange()" />
+                    <label class="btn btn-outline-secondary btn-sm" for="payCash"><i class="bi bi-cash me-1"></i>Cash</label>
+
+                    <input type="radio" class="btn-check" name="payMethod" id="payGCash" value="GCash" onchange="onPaymentMethodChange()" />
+                    <label class="btn btn-outline-secondary btn-sm" for="payGCash"><i class="bi bi-phone me-1"></i>GCash</label>
+
+                    <input type="radio" class="btn-check" name="payMethod" id="payCard" value="Card" onchange="onPaymentMethodChange()" />
+                    <label class="btn btn-outline-secondary btn-sm" for="payCard"><i class="bi bi-credit-card me-1"></i>Card</label>
+
+                    <input type="radio" class="btn-check" name="payMethod" id="payMongo" value="PayMongo" onchange="onPaymentMethodChange()" />
+                    <label class="btn btn-outline-secondary btn-sm" for="payMongo"><i class="bi bi-shield-check me-1"></i>PayMongo</label>
+                </div>
+            </div>
+
+            <!-- Cash Tendered & Change -->
+            <div id="cashCalcArea">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text bg-white">Cash Tendered ₱</span>
+                    <input type="number" id="cashTendered" class="form-control text-end fw-bold" placeholder="0.00" oninput="updateChange()" />
+                </div>
+                <div class="d-flex gap-1 mb-2">
+                    <button type="button" class="btn btn-sm btn-light border flex-fill py-0" style="font-size: 11px;" onclick="setTenderedExact()">Exact</button>
+                    <button type="button" class="btn btn-sm btn-light border flex-fill py-0" style="font-size: 11px;" onclick="addTendered(100)">+100</button>
+                    <button type="button" class="btn btn-sm btn-light border flex-fill py-0" style="font-size: 11px;" onclick="addTendered(500)">+500</button>
+                    <button type="button" class="btn btn-sm btn-light border flex-fill py-0" style="font-size: 11px;" onclick="addTendered(1000)">+1k</button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded bg-light border">
+                    <span class="text-muted" style="font-size: 12px; font-weight: 600;">Change:</span>
+                    <span class="fw-bold text-dark fs-6">₱<span id="changeDisplay">0.00</span></span>
+                </div>
+            </div>
+
+            <button type="button" id="btnCheckout" class="btn btn-careplus w-100 py-2 fs-6" disabled onclick="submitCheckout()">
+                <i class="bi bi-check2-circle me-1"></i> Complete Checkout &amp; Receipt
+            </button>
+        </div>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+<script>
+    let cart = [];
+    let prescriptionId = @(rx != null ? rx.Id : 0);
+
+    // Initial Rx pre-load if provided
+    @if (rx != null)
+    {
+        foreach (var d in rx.Details)
+        {
+            <text>
+            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity);
+            </text>
+        }
+    }
+
+    function filterMeds() {
+        const query = document.getElementById('medSearch').value.toLowerCase().trim();
+        const cat = document.getElementById('catFilter').value.toLowerCase().trim();
+        const cards = document.querySelectorAll('.med-card-wrapper');
+
+        cards.forEach(card => {
+            const name = card.dataset.name || '';
+            const generic = card.dataset.generic || '';
+            const cardCat = card.dataset.cat || '';
+            const mfr = card.dataset.mfr || '';
+
+            const matchesQuery = !query || name.includes(query) || generic.includes(query) || mfr.includes(query);
+            const matchesCat = !cat || cardCat === cat;
+
+            card.style.display = (matchesQuery && matchesCat) ? 'block' : 'none';
+        });
+    }
+
+    function addToCart(medId, medName, price, maxStock, initialQty = 1) {
+        const existing = cart.find(i => i.medId === medId);
+        if (existing) {
+            if (existing.qty + initialQty <= maxStock) {
+                existing.qty += initialQty;
+            } else {
+                alert(`Cannot add more. Only ${maxStock} units in stock.`);
+            }
+        } else {
+            if (initialQty <= maxStock) {
+                cart.push({ medId, medName, price, maxStock, qty: initialQty });
+            } else {
+                alert(`Cannot add. Only ${maxStock} units in stock.`);
+            }
+        }
+        renderCart();
+    }
+
+    function changeQty(medId, delta) {
+        const item = cart.find(i => i.medId === medId);
+        if (!item) return;
+
+        const newQty = item.qty + delta;
+        if (newQty <= 0) {
+            removeFromCart(medId);
+        } else if (newQty <= item.maxStock) {
+            item.qty = newQty;
+            renderCart();
+        } else {
+            alert(`Maximum available stock is ${item.maxStock}`);
+        }
+    }
+
+    function removeFromCart(medId) {
+        cart = cart.filter(i => i.medId !== medId);
+        renderCart();
+    }
+
+    function clearCart() {
+        cart = [];
+        renderCart();
+    }
+
+    function renderCart() {
+        const emptyMsg = document.getElementById('emptyCartMsg');
+        const cartList = document.getElementById('cartList');
+        const btnCheckout = document.getElementById('btnCheckout');
+
+        if (cart.length === 0) {
+            emptyMsg.style.display = 'block';
+            cartList.innerHTML = '';
+            btnCheckout.disabled = true;
+        } else {
+            emptyMsg.style.display = 'none';
+            btnCheckout.disabled = false;
+
+            let html = '';
+            cart.forEach(item => {
+                const itemTotal = (item.qty * item.price).toFixed(2);
+                html += `
+                    <div class="pos-item-card">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${item.medName}</div>
+                            <div class="text-muted" style="font-size: 11.5px;">₱${item.price.toFixed(2)} each</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, -1)">-</button>
+                            <span class="fw-bold px-1" style="font-size: 13px; min-width: 22px; text-align: center;">${item.qty}</span>
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, 1)">+</button>
+                            <span class="fw-bold text-dark ms-2" style="font-size: 13px; min-width: 55px; text-align: right;">₱${itemTotal}</span>
+                            <button type="button" class="btn btn-sm text-danger border-0 p-0 ms-1" onclick="removeFromCart(${item.medId})">
+                                <i class="bi bi-x fs-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            cartList.innerHTML = html;
+        }
+
+        updateSummary();
+    }
+
+    function onCustomerChange() {
+        const select = document.getElementById('customerSelect');
+        const card = document.getElementById('crmCustomerCard');
+        const selected = select.options[select.selectedIndex];
+        const points = parseInt(selected.dataset.points || '0', 10);
+        const tier = selected.dataset.tier || '';
+
+        if (select.value) {
+            card.classList.remove('d-none');
+            document.getElementById('crmPointsAvailable').innerText = points;
+            document.getElementById('crmTierBadge').innerText = tier;
+        } else {
+            card.classList.add('d-none');
+            document.getElementById('usePointsSwitch').checked = false;
+        }
+        updateSummary();
+    }
+
+    function updateSummary() {
+        const subtotal = cart.reduce((sum, i) => sum + (i.qty * i.price), 0);
+        document.getElementById('subtotalDisplay').innerText = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const select = document.getElementById('customerSelect');
+        const usePoints = document.getElementById('usePointsSwitch').checked;
+        const availablePoints = parseInt(select.options[select.selectedIndex]?.dataset.points || '0', 10);
+
+        let discount = 0;
+        if (usePoints && availablePoints > 0) {
+            discount = Math.min(availablePoints, Math.floor(subtotal));
+            document.getElementById('discountRow').classList.remove('d-none');
+            document.getElementById('discountDisplay').innerText = discount.toFixed(2);
+        } else {
+            document.getElementById('discountRow').classList.add('d-none');
+        }
+
+        const netTotal = Math.max(0, subtotal - discount);
+        document.getElementById('netTotalDisplay').innerText = netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        updateChange();
+    }
+
+    function onPaymentMethodChange() {
+        const method = document.querySelector('input[name="payMethod"]:checked').value;
+        const cashArea = document.getElementById('cashCalcArea');
+        if (method === 'Cash') {
+            cashArea.style.display = 'block';
+        } else {
+            cashArea.style.display = 'none';
+            document.getElementById('cashTendered').value = '';
+            document.getElementById('changeDisplay').innerText = '0.00';
+        }
+    }
+
+    function updateChange() {
+        const netStr = document.getElementById('netTotalDisplay').innerText.replace(/,/g, '');
+        const netTotal = parseFloat(netStr) || 0;
+        const tendered = parseFloat(document.getElementById('cashTendered').value) || 0;
+        const change = Math.max(0, tendered - netTotal);
+        document.getElementById('changeDisplay').innerText = change.toFixed(2);
+    }
+
+    function setTenderedExact() {
+        const netStr = document.getElementById('netTotalDisplay').innerText.replace(/,/g, '');
+        document.getElementById('cashTendered').value = parseFloat(netStr) || 0;
+        updateChange();
+    }
+
+    function addTendered(val) {
+        const cur = parseFloat(document.getElementById('cashTendered').value) || 0;
+        document.getElementById('cashTendered').value = cur + val;
+        updateChange();
+    }
+
+    async function submitCheckout() {
+        if (cart.length === 0) return;
+
+        const customerId = parseInt(document.getElementById('customerSelect').value, 10) || null;
+        const payMethod = document.querySelector('input[name="payMethod"]:checked').value;
+        const netStr = document.getElementById('netTotalDisplay').innerText.replace(/,/g, '');
+        const netTotal = parseFloat(netStr) || 0;
+
+        let cashTendered = parseFloat(document.getElementById('cashTendered').value) || 0;
+        if (payMethod !== 'Cash') {
+            cashTendered = netTotal;
+        } else if (cashTendered < netTotal) {
+            alert(`Cash tendered (₱${cashTendered.toFixed(2)}) is less than net payable (₱${netTotal.toFixed(2)}).`);
+            return;
+        }
+
+        const usePoints = document.getElementById('usePointsSwitch').checked;
+        const availablePoints = parseInt(document.getElementById('customerSelect').options[document.getElementById('customerSelect').selectedIndex]?.dataset.points || '0', 10);
+        const pointsToRedeem = usePoints ? Math.min(availablePoints, Math.floor(netTotal)) : 0;
+
+        const payload = {
+            customerId: customerId,
+            prescriptionId: prescriptionId > 0 ? prescriptionId : null,
+            paymentMethod: payMethod,
+            cashTendered: cashTendered,
+            pointsToRedeem: pointsToRedeem,
+            items: cart.map(i => ({ medicineId: i.medId, quantity: i.qty }))
+        };
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+        const btn = document.getElementById('btnCheckout');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processing Sale...';
+
+        try {
+            const resp = await fetch('@Url.Action("Checkout", "Sales")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await resp.json();
+            if (data.success) {
+                window.location.href = data.redirectUrl;
+            } else {
+                alert(data.message || 'Failed to complete checkout.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Complete Checkout &amp; Receipt';
+            }
+        } catch (err) {
+            console.error(err);
+            alert('An unexpected error occurred during checkout.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Complete Checkout &amp; Receipt';
+        }
+    }
+
+    // Call onCustomerChange once on load to configure pre-selected customer
+    document.addEventListener('DOMContentLoaded', () => {
+        onCustomerChange();
+    });
+</script>
+}

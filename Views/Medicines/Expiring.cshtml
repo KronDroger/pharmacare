@@ -1,0 +1,301 @@
+@model List<CarePlusPharmacy.Models.MedicineBatch>
+@{
+    ViewData["Title"] = "Expiry Monitoring & Spoilage Prevention";
+    var today = DateTime.Today;
+
+    var expiredBatches = Model.Where(b => b.ExpiryDate < today && b.Quantity > 0).ToList();
+    var criticalBatches = Model.Where(b => b.ExpiryDate >= today && b.ExpiryDate <= today.AddDays(30) && b.Quantity > 0).ToList();
+    var warningBatches = Model.Where(b => b.ExpiryDate > today.AddDays(30) && b.ExpiryDate <= today.AddDays(90) && b.Quantity > 0).ToList();
+    var safeBatches = Model.Where(b => b.ExpiryDate > today.AddDays(90) && b.Quantity > 0).ToList();
+
+    var expiredValue = expiredBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
+    var criticalValue = criticalBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
+    var warningValue = warningBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
+}
+
+<!-- Expiry Monitoring Header Banner -->
+<div class="card border-0 mb-4 shadow-sm" style="background: linear-gradient(135deg, #1c1917 0%, #292524 100%); border-radius: var(--radius-lg);">
+    <div class="card-body p-4 text-white">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="mb-1 fw-bold" style="color: #f87171; font-size: 13px;">
+                    <i class="bi bi-shield-exclamation me-1"></i> Regulatory Compliance &amp; Tracking
+                </div>
+                <h3 class="fw-bold mb-1">Batch Expiration &amp; Spoilage Prevention</h3>
+                <p class="text-white-50 mb-0" style="font-size: 13.5px;">Proactively track medicine batch lifecycles, eliminate expired stock wastage, and comply with FDA &amp; DOH pharmacy dispensing regulations.</p>
+            </div>
+            <div class="col-lg-4 text-lg-end text-center mt-3 mt-lg-0">
+                <a asp-action="Index" class="btn btn-outline-light me-2">
+                    <i class="bi bi-capsule me-1"></i> Inventory Catalog
+                </a>
+                <button type="button" class="btn btn-accent" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print Audit Log
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Risk Tier KPI Cards -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="stat-card">
+        <div class="stat-icon icon-red">
+            <i class="bi bi-x-octagon-fill"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Expired Batches</div>
+            <div class="stat-value text-danger">@expiredBatches.Count <span style="font-size: 13px; font-weight: 500; color: #e53935;">(₱@expiredValue.ToString("N2"))</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-danger fw-bold"><i class="bi bi-shield-slash"></i> Quarantine</span> write-off
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon icon-orange">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Critical (&le; 30 Days)</div>
+            <div class="stat-value text-warning">@criticalBatches.Count <span style="font-size: 13px; font-weight: 500; color: #fb8c00;">(₱@criticalValue.ToString("N2"))</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-warning fw-bold">Priority</span> dispensing required
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon icon-amber">
+            <i class="bi bi-hourglass-split"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Warning (31 - 90 Days)</div>
+            <div class="stat-value text-warning">@warningBatches.Count <span style="font-size: 13px; font-weight: 500; color: #7b809a;">batches</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-secondary fw-bold">Monitor</span> next cycle
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon icon-green">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Healthy Stock (> 90 Days)</div>
+            <div class="stat-value text-success">@safeBatches.Count <span style="font-size: 13px; font-weight: 500; color: #7b809a;">safe</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-success fw-bold">Safe</span> shelf lifespan
+        </div>
+    </div>
+</div>
+
+<!-- Filter Pills -->
+<div class="d-flex gap-2 mb-3 no-print">
+    <button type="button" class="btn btn-sm btn-dark" onclick="filterBatches('all')">All Batches (@Model.Count)</button>
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="filterBatches('expired')">Expired (@expiredBatches.Count)</button>
+    <button type="button" class="btn btn-sm btn-outline-warning" onclick="filterBatches('critical')">Critical &le; 30d (@criticalBatches.Count)</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filterBatches('warning')">Warning &le; 90d (@warningBatches.Count)</button>
+    <button type="button" class="btn btn-sm btn-outline-success" onclick="filterBatches('safe')">Safe Stock (@safeBatches.Count)</button>
+</div>
+
+<!-- Batch-Level Expiry Ledger -->
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-calendar-check text-danger me-2"></i>Physical Medicine Batch Expiry Ledger</div>
+            <div class="text-muted" style="font-size: 12px;">FIFO-priority stock allocation tracks every inbound lot number and expiration date</div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Batch Lot #</th>
+                    <th>Medicine / Generic Name</th>
+                    <th>Remaining Qty</th>
+                    <th>Unit Price</th>
+                    <th>Batch Valuation</th>
+                    <th>Expiry Date</th>
+                    <th>Status Tier</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            No medicine batches registered in inventory.
+                        </td>
+                    </tr>
+                }
+                @foreach (var b in Model)
+                {
+                    var days = (b.ExpiryDate.Date - today).Days;
+                    string rowClass = "";
+                    string tierKey = "safe";
+
+                    if (b.Quantity <= 0)
+                    {
+                        tierKey = "depleted";
+                    }
+                    else if (days < 0)
+                    {
+                        tierKey = "expired";
+                        rowClass = "table-danger-subtle";
+                    }
+                    else if (days <= 30)
+                    {
+                        tierKey = "critical";
+                        rowClass = "table-warning-subtle";
+                    }
+                    else if (days <= 90)
+                    {
+                        tierKey = "warning";
+                    }
+
+                    var batchValue = b.Quantity * (b.Medicine?.UnitPrice ?? 0);
+
+                    <tr class="batch-row @rowClass" data-tier="@tierKey">
+                        <td>
+                            <div class="fw-bold text-dark font-monospace">@b.BatchNumber</div>
+                            <div class="text-muted" style="font-size: 11px;">Recv: @b.DateReceived.ToString("yyyy-MM-dd")</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">@b.Medicine?.Name</div>
+                            <div class="text-muted" style="font-size: 11.5px;"><i class="bi bi-capsule me-1"></i>@(b.Medicine?.GenericName ?? "Formula")</div>
+                        </td>
+                        <td>
+                            <span class="fw-bold fs-6 @(b.Quantity <= 0 ? "text-muted" : "text-dark")">@b.Quantity units</span>
+                        </td>
+                        <td>₱@(b.Medicine?.UnitPrice.ToString("N2") ?? "0.00")</td>
+                        <td>
+                            <span class="fw-bold @(days < 0 && b.Quantity > 0 ? "text-danger" : "text-dark")">
+                                ₱@batchValue.ToString("N2")
+                            </span>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">@b.ExpiryDate.ToString("yyyy-MM-dd")</div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                @if (days < 0)
+                                {
+                                    <span class="text-danger fw-bold">Expired @(Math.Abs(days)) days ago</span>
+                                }
+                                else if (days == 0)
+                                {
+                                    <span class="text-danger fw-bold">Expires TODAY</span>
+                                }
+                                else
+                                {
+                                    <span>@days days remaining</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (b.Quantity <= 0)
+                            {
+                                <span class="text-secondary fw-semibold">Depleted</span>
+                            }
+                            else if (days < 0)
+                            {
+                                <span class="text-danger fw-semibold"><i class="bi bi-x-circle me-1"></i>Expired</span>
+                            }
+                            else if (days <= 30)
+                            {
+                                <span class="text-warning fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>Critical &le; 30d</span>
+                            }
+                            else if (days <= 90)
+                            {
+                                <span class="text-info fw-semibold"><i class="bi bi-hourglass me-1"></i>Monitor &le; 90d</span>
+                            }
+                            else
+                            {
+                                <span class="text-success fw-semibold"><i class="bi bi-shield-check me-1"></i>Healthy</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (b.Quantity > 0 && (User.IsInRole("Admin") || User.IsInRole("InventoryCoordinator")))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 12px;"
+                                        onclick="openQuarantineModal(@b.Id, '@b.BatchNumber', '@(b.Medicine?.Name.Replace("'", "\\'"))', @b.Quantity)">
+                                    <i class="bi bi-shield-x me-1"></i> Quarantine
+                                </button>
+                            }
+                            <a asp-action="Details" asp-route-id="@b.MedicineId" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 12px;">
+                                <i class="bi bi-eye"></i> Medicine
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Quarantine / Write-Off Modal -->
+<div class="modal fade" id="quarantineModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: var(--radius-lg);">
+            <form asp-action="QuarantineBatch" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold text-danger"><i class="bi bi-shield-slash-fill me-2"></i>Quarantine / Write-Off Stock Batch</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="modalBatchId" name="id" />
+                    <div class="alert alert-warning border-0 d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 text-warning"></i>
+                        <div style="font-size: 13px;">This action will mark the batch units as spoiled/expired and write off inventory under regulatory compliance audit.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Batch Lot #</label>
+                        <input type="text" id="modalBatchNumber" class="form-control bg-light" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Medicine &amp; Units to Remove</label>
+                        <input type="text" id="modalBatchInfo" class="form-control bg-light" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Reason for Quarantine</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="Expired Product (Beyond Best-Before Date)">Expired Product (Beyond Expiration Date)</option>
+                            <option value="Damaged Packaging / Storage Temperature Breach">Damaged Packaging / Storage Temperature Breach</option>
+                            <option value="Manufacturer Quality Recall Notice">Manufacturer Quality Recall Notice</option>
+                            <option value="Return to Supplier for Credit">Return to Supplier for Credit</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Confirm Quarantine &amp; Write-Off</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function filterBatches(tier) {
+        const rows = document.querySelectorAll('.batch-row');
+        rows.forEach(r => {
+            if (tier === 'all') {
+                r.style.display = '';
+            } else {
+                r.style.display = r.dataset.tier === tier ? '' : 'none';
+            }
+        });
+    }
+
+    function openQuarantineModal(id, batchNum, medName, qty) {
+        document.getElementById('modalBatchId').value = id;
+        document.getElementById('modalBatchNumber').value = batchNum;
+        document.getElementById('modalBatchInfo').value = `${medName} (${qty} units)`;
+        new bootstrap.Modal(document.getElementById('quarantineModal')).show();
+    }
+</script>
+}

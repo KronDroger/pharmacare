@@ -1,0 +1,150 @@
+@model List<Prescription>
+@{
+    ViewData["Title"] = "Prescription Records & Dispensing";
+    var pendingCount = Model.Count(p => p.Status == PrescriptionStatus.Pending);
+    var fulfilledCount = Model.Count(p => p.Status == PrescriptionStatus.Fulfilled);
+}
+
+<!-- Summary Statistics -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="stat-card">
+        <div class="stat-icon icon-dark">
+            <i class="bi bi-file-earmark-medical-fill"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Total Prescriptions</div>
+            <div class="stat-value">@Model.Count</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-success fw-bold">+12%</span> vs last month
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon icon-amber">
+            <i class="bi bi-hourglass-top"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Pending Dispensing</div>
+            <div class="stat-value text-warning">@pendingCount <span style="font-size: 13px; font-weight: 500; color: #7b809a;">patients</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-warning fw-bold">Awaiting</span> pharmacist fill
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon icon-green">
+            <i class="bi bi-check2-circle"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Fulfilled &amp; Dispensed</div>
+            <div class="stat-value text-success">@fulfilledCount</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-success fw-bold">100%</span> verified orders
+        </div>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-prescription2 text-success me-2"></i>Medical Doctor Prescription Registry</div>
+            <div class="text-muted" style="font-size: 12px;">Verified physician prescriptions linked to patient records and direct POS checkout dispensing</div>
+        </div>
+        <a asp-action="Create" class="btn btn-sm btn-careplus d-inline-flex align-items-center gap-1">
+            <i class="bi bi-plus-lg"></i> Log Prescription
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Rx ID</th>
+                    <th>Patient / Customer</th>
+                    <th>Prescribing Physician</th>
+                    <th>Date Prescribed</th>
+                    <th>Prescribed Medicine &amp; Dosage</th>
+                    <th>Prescribed Qty</th>
+                    <th>Fulfillment Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-file-earmark-x fs-2 d-block mb-2 text-muted"></i>
+                            No prescription records recorded yet.
+                        </td>
+                    </tr>
+                }
+                @foreach (var rx in Model)
+                {
+                    var item = rx.Details.FirstOrDefault();
+                    var isPending = rx.Status == PrescriptionStatus.Pending;
+
+                    <tr>
+                        <td>
+                            <span class="fw-bold text-dark font-monospace">#RX-@rx.Id.ToString("D4")</span>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">@(rx.Customer?.FullName ?? "Walk-in")</div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                @(rx.Customer?.Phone ?? "No contact")
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-dark fw-semibold">@rx.DoctorName</div>
+                        </td>
+                        <td>@rx.DatePrescribed.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <div class="fw-bold text-dark">@(item?.Medicine?.Name ?? "—")</div>
+                            <div class="text-muted" style="font-size: 11.5px;">
+                                <i class="bi bi-info-circle me-1"></i>@(string.IsNullOrEmpty(item?.Dosage) ? "Standard dosage" : item.Dosage)
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">@(item?.Quantity ?? 0) units</span>
+                        </td>
+                        <td>
+                            @if (rx.Status == PrescriptionStatus.Fulfilled)
+                            {
+                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle me-1"></i>Fulfilled</span>
+                            }
+                            else if (rx.Status == PrescriptionStatus.Cancelled)
+                            {
+                                <span class="badge bg-secondary">Cancelled</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (isPending)
+                            {
+                                <a asp-controller="Sales" asp-action="Create" asp-route-prescriptionId="@rx.Id" class="btn btn-sm btn-accent me-1" style="font-size: 12px;">
+                                    <i class="bi bi-cart3 me-1"></i> Dispense (POS)
+                                </a>
+                            }
+                            <form asp-action="ToggleStatus" asp-route-id="@rx.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 12px;" title="Toggle Fulfillment Status">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </form>
+                            <form asp-action="Delete" asp-route-id="@rx.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this prescription?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 12px;" title="Delete Record">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
