@@ -64,7 +64,7 @@
         <div class="col-6 col-md-4 col-lg-2">
             <div class="category-card @(i == 0 ? "dark" : "")">
                 <div class="cat-title text-truncate" title="@cat.Category">@cat.Category</div>
-                <div class="cat-count">@cat.Stock</div>
+                <div class="cat-count text-end num">@cat.Stock.ToString("N0")</div>
             </div>
         </div>
     }
