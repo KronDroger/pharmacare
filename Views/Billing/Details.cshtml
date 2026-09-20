@@ -73,9 +73,9 @@
             <thead class="bg-light">
                 <tr>
                     <th style="width: 50%;">MEDICINE / PHARMACEUTICAL ITEM</th>
-                    <th class="text-center" style="width: 12%;">QTY</th>
-                    <th class="text-end" style="width: 18%;">UNIT PRICE</th>
-                    <th class="text-end" style="width: 20%;">TOTAL AMOUNT</th>
+                    <th class="num" style="width: 12%;">QTY</th>
+                    <th class="num" style="width: 18%;">UNIT PRICE</th>
+                    <th class="num" style="width: 20%;">TOTAL AMOUNT</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,9 +90,9 @@
                                     Formula: @(item.Medicine?.GenericName ?? "Pharmaceutical Standard")
                                 </div>
                             </td>
-                            <td class="text-center fw-semibold">@item.Quantity</td>
-                            <td class="text-end">₱@item.UnitPrice.ToString("N2")</td>
-                            <td class="text-end fw-bold">₱@item.LineTotal.ToString("N2")</td>
+                            <td class="num fw-semibold">@item.Quantity.ToString("N0")</td>
+                            <td class="num">₱@item.UnitPrice.ToString("N2")</td>
+                            <td class="num fw-bold">₱@item.LineTotal.ToString("N2")</td>
                         </tr>
                     }
                 }

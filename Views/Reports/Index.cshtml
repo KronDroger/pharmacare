@@ -1,8 +1,8 @@
 @{
     ViewData["Title"] = "Executive Reports & Analytics";
     var salesByMonth = ViewBag.SalesByMonth as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
-    var topMedicines = ViewBag.TopMedicines as List<CarePlusPharmacy.Controllers.ReportsController.TopSellerReportItem> ?? new();
-    var topCustomers = ViewBag.TopCustomers as List<CarePlusPharmacy.Controllers.ReportsController.TopCustomerReportItem> ?? new();
+    var topMedicines = ViewBag.TopMedicines as CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Controllers.ReportsController.TopSellerReportItem> ?? new CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Controllers.ReportsController.TopSellerReportItem>(new List<CarePlusPharmacy.Controllers.ReportsController.TopSellerReportItem>(), 0, 1, 10);
+    var topCustomers = ViewBag.TopCustomers as CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Controllers.ReportsController.TopCustomerReportItem> ?? new CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Controllers.ReportsController.TopCustomerReportItem>(new List<CarePlusPharmacy.Controllers.ReportsController.TopCustomerReportItem>(), 0, 1, 10);
 
     decimal totalRevenue = ViewBag.TotalRevenue ?? 0;
     decimal inventoryValue = ViewBag.InventoryValue ?? 0;
@@ -20,7 +20,7 @@
         <div class="text-muted" style="font-size: 13px;">Real-time business intelligence across sales, inventory valuation, purchasing, and patient CRM</div>
     </div>
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-careplus" onclick="window.print()">
+        <button type="button" class="btn btn-careplus" onclick="printAllFiltered()">
             <i class="bi bi-printer me-1"></i> Print / Export Report
         </button>
         <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
@@ -122,8 +122,8 @@
                         <tr>
                             <th>Medicine</th>
                             <th>Category</th>
-                            <th>Units Sold</th>
-                            <th class="text-end">Revenue</th>
+                            <th class="num">Units Sold</th>
+                            <th class="num">Revenue</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -136,13 +136,14 @@
                             <tr>
                                 <td class="fw-bold text-dark">@med.MedicineName</td>
                                 <td><span class="badge bg-light text-muted border">@med.Category</span></td>
-                                <td class="fw-semibold">@med.UnitsSold units</td>
-                                <td class="text-end fw-bold text-success">₱@med.Revenue.ToString("N2")</td>
+                                <td class="num fw-semibold">@med.UnitsSold.ToString("N0")</td>
+                                <td class="num fw-bold text-success">₱@med.Revenue.ToString("N2")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+            @await Html.PartialAsync("_Pagination", topMedicines, new ViewDataDictionary(ViewData) { { "PageParam", "medPage" }, { "PageSizeParam", "medPageSize" } })
         </div>
     </div>
 
@@ -161,9 +162,9 @@
                         <tr>
                             <th>Patient Name</th>
                             <th>Tier</th>
-                            <th>Orders</th>
-                            <th>Points</th>
-                            <th class="text-end">Total Spent</th>
+                            <th class="num">Orders</th>
+                            <th class="num">Points</th>
+                            <th class="num">Total Spent</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -189,14 +190,15 @@
                                         <span class="badge-tier-silver" style="font-size: 10px;">@cust.Tier</span>
                                     }
                                 </td>
-                                <td>@cust.OrdersCount order(s)</td>
-                                <td class="fw-bold text-success">@cust.LoyaltyPoints pts</td>
-                                <td class="text-end fw-bold text-dark">₱@cust.TotalSpent.ToString("N2")</td>
+                                <td class="num">@cust.OrdersCount.ToString("N0")</td>
+                                <td class="num fw-bold text-success">@cust.LoyaltyPoints.ToString("N0") pts</td>
+                                <td class="num fw-bold text-dark">₱@cust.TotalSpent.ToString("N2")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+            @await Html.PartialAsync("_Pagination", topCustomers, new ViewDataDictionary(ViewData) { { "PageParam", "custPage" }, { "PageSizeParam", "custPageSize" } })
         </div>
     </div>
 </div>
@@ -252,6 +254,21 @@
                     }
                 }
             });
+        }
+
+        function printAllFiltered() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('print', 'true');
+            window.open(url.toString(), '_blank');
+        }
+
+        @if (ViewBag.Print == true)
+        {
+            <text>
+            window.addEventListener('load', function() {
+                setTimeout(function() { window.print(); }, 400);
+            });
+            </text>
         }
     </script>
 }

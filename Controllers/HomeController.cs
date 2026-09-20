@@ -22,7 +22,7 @@ namespace CarePlusPharmacy.Controllers
         {
             if (User.IsInRole("Customer"))
             {
-                return RedirectToAction("Index", "Customers");
+                return RedirectToAction("MySubscriptions", "Subscriptions");
             }
             var medicines = await _context.Medicines.Include(m => m.Batches).ToListAsync();
             var sales = await _context.Sales

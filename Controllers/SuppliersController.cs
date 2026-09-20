@@ -13,13 +13,14 @@ namespace CarePlusPharmacy.Controllers
         private readonly ApplicationDbContext _context;
         public SuppliersController(ApplicationDbContext context) => _context = context;
 
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 10)
         {
             var query = _context.Suppliers.AsQueryable();
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(s => s.Name.Contains(search));
             ViewBag.Search = search;
-            return View(await query.OrderBy(s => s.Name).ToListAsync());
+            var suppliers = await PaginatedList<Supplier>.CreateAsync(query.OrderBy(s => s.Name), page, pageSize);
+            return View(suppliers);
         }
 
         public IActionResult Create() => View();

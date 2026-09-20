@@ -70,9 +70,9 @@
         <thead>
             <tr class="border-bottom text-muted" style="font-size: 11px;">
                 <th class="py-1 text-start">ITEM / BATCH</th>
-                <th class="py-1 text-center">QTY</th>
-                <th class="py-1 text-end">PRICE</th>
-                <th class="py-1 text-end">TOTAL</th>
+                <th class="py-1 num">QTY</th>
+                <th class="py-1 num">PRICE</th>
+                <th class="py-1 num">TOTAL</th>
             </tr>
         </thead>
         <tbody>
@@ -85,9 +85,9 @@
                             Batch: @(d.Batch?.BatchNumber ?? "FIFO-Auto")
                         </div>
                     </td>
-                    <td class="py-1 text-center">@d.Quantity</td>
-                    <td class="py-1 text-end">₱@d.UnitPrice.ToString("N2")</td>
-                    <td class="py-1 text-end fw-bold">₱@d.LineTotal.ToString("N2")</td>
+                    <td class="py-1 num">@d.Quantity.ToString("N0")</td>
+                    <td class="py-1 num">₱@d.UnitPrice.ToString("N2")</td>
+                    <td class="py-1 num fw-bold">₱@d.LineTotal.ToString("N2")</td>
                 </tr>
             }
         </tbody>

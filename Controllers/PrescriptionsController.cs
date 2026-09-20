@@ -13,13 +13,21 @@ namespace CarePlusPharmacy.Controllers
         private readonly ApplicationDbContext _context;
         public PrescriptionsController(ApplicationDbContext context) => _context = context;
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
-            var prescriptions = await _context.Prescriptions
+            var baseQuery = _context.Prescriptions.AsQueryable();
+
+            ViewBag.TotalCountAll = await baseQuery.CountAsync();
+            ViewBag.PendingCountAll = await baseQuery.CountAsync(p => p.Status == PrescriptionStatus.Pending);
+            ViewBag.FulfilledCountAll = await baseQuery.CountAsync(p => p.Status == PrescriptionStatus.Fulfilled);
+
+            var query = baseQuery
                 .Include(p => p.Customer)
                 .Include(p => p.Details).ThenInclude(d => d.Medicine)
                 .OrderByDescending(p => p.DatePrescribed)
-                .ToListAsync();
+                .ThenByDescending(p => p.Id);
+
+            var prescriptions = await PaginatedList<Prescription>.CreateAsync(query, page, pageSize);
             return View(prescriptions);
         }
 

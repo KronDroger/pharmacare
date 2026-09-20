@@ -13,13 +13,14 @@ namespace CarePlusPharmacy.Controllers
         private readonly ApplicationDbContext _context;
         public PurchaseOrdersController(ApplicationDbContext context) => _context = context;
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
-            var orders = await _context.PurchaseOrders
+            var query = _context.PurchaseOrders
                 .Include(p => p.Supplier)
                 .Include(p => p.Details).ThenInclude(d => d.Medicine)
                 .OrderByDescending(p => p.OrderDate)
-                .ToListAsync();
+                .ThenByDescending(p => p.Id);
+            var orders = await PaginatedList<PurchaseOrder>.CreateAsync(query, page, pageSize);
             return View(orders);
         }
 

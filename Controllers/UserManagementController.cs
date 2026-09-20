@@ -19,16 +19,18 @@ namespace CarePlusPharmacy.Controllers
             _roleManager = roleManager;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
-            var users = _userManager.Users.ToList();
+            var query = _userManager.Users.OrderBy(u => u.Email);
+            var paginatedUsers = await PaginatedList<ApplicationUser>.CreateAsync(query, page, pageSize);
+
             var userRoles = new Dictionary<string, IList<string>>();
-            foreach (var user in users)
+            foreach (var user in paginatedUsers)
                 userRoles[user.Id] = await _userManager.GetRolesAsync(user);
 
             ViewBag.UserRoles = userRoles;
             ViewBag.AllRoles = _roleManager.Roles.Select(r => r.Name).ToList();
-            return View(users);
+            return View(paginatedUsers);
         }
 
         [HttpPost]

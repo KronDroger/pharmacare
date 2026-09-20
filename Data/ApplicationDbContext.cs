@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CarePlusPharmacy.Data
 {
     // Extends IdentityDbContext so AspNetUsers / AspNetRoles (RBAC) live alongside
-    // the pharmacy's own 11 domain tables, matching the project's Data Dictionary.
+    // the pharmacy's own domain tables, matching the project's Data Dictionary.
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -25,6 +25,9 @@ namespace CarePlusPharmacy.Data
         public DbSet<SaleDetail> SaleDetails { get; set; }
         public DbSet<Billing> Billings { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+        public DbSet<CustomerSubscription> CustomerSubscriptions { get; set; }
+        public DbSet<Branch> Branches { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -113,6 +116,24 @@ namespace CarePlusPharmacy.Data
                 .WithOne(s => s.Billing)
                 .HasForeignKey<Billing>(b => b.SaleId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SubscriptionPlan>()
+                .HasOne(p => p.Medicine)
+                .WithMany()
+                .HasForeignKey(p => p.MedicineId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<CustomerSubscription>()
+                .HasOne(s => s.Customer)
+                .WithMany()
+                .HasForeignKey(s => s.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<CustomerSubscription>()
+                .HasOne(s => s.SubscriptionPlan)
+                .WithMany(p => p.Subscriptions)
+                .HasForeignKey(s => s.SubscriptionPlanId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

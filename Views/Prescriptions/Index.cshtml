@@ -1,8 +1,9 @@
-@model List<Prescription>
+@model CarePlusPharmacy.Models.PaginatedList<Prescription>
 @{
     ViewData["Title"] = "Prescription Records & Dispensing";
-    var pendingCount = Model.Count(p => p.Status == PrescriptionStatus.Pending);
-    var fulfilledCount = Model.Count(p => p.Status == PrescriptionStatus.Fulfilled);
+    int totalCount = ViewBag.TotalCountAll ?? 0;
+    int pendingCount = ViewBag.PendingCountAll ?? 0;
+    int fulfilledCount = ViewBag.FulfilledCountAll ?? 0;
 }
 
 <!-- Summary Statistics -->
@@ -13,7 +14,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Total Prescriptions</div>
-            <div class="stat-value">@Model.Count</div>
+            <div class="stat-value">@totalCount</div>
         </div>
         <div class="stat-footer">
             <span class="text-success fw-bold">+12%</span> vs last month
@@ -65,7 +66,7 @@
                     <th>Prescribing Physician</th>
                     <th>Date Prescribed</th>
                     <th>Prescribed Medicine &amp; Dosage</th>
-                    <th>Prescribed Qty</th>
+                    <th class="num">Prescribed Qty (units)</th>
                     <th>Fulfillment Status</th>
                     <th class="text-end">Actions</th>
                 </tr>
@@ -105,8 +106,8 @@
                                 <i class="bi bi-info-circle me-1"></i>@(string.IsNullOrEmpty(item?.Dosage) ? "Standard dosage" : item.Dosage)
                             </div>
                         </td>
-                        <td>
-                            <span class="badge bg-light text-dark border">@(item?.Quantity ?? 0) units</span>
+                        <td class="num">
+                            <span class="fw-bold fs-6">@((item?.Quantity ?? 0).ToString("N0"))</span>
                         </td>
                         <td>
                             @if (rx.Status == PrescriptionStatus.Fulfilled)
@@ -147,4 +148,5 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>

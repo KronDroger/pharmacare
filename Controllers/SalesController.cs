@@ -21,15 +21,25 @@ namespace CarePlusPharmacy.Controllers
         }
 
         // List all sales transactions
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
-            var sales = await _context.Sales
+            var baseQuery = _context.Sales.AsQueryable();
+
+            var allSalesData = await baseQuery.Select(s => new { Discount = s.DiscountAmount, Gross = s.Details.Sum(d => (decimal?)(d.Quantity * d.UnitPrice)) ?? 0m }).ToListAsync();
+            ViewBag.TotalRevenueAll = allSalesData.Sum(s => Math.Max(0, s.Gross - s.Discount));
+            ViewBag.TotalCountAll = await baseQuery.CountAsync();
+            ViewBag.TotalItemsAll = await _context.SaleDetails.SumAsync(d => (int?)d.Quantity) ?? 0;
+            ViewBag.TotalPointsAll = await baseQuery.SumAsync(s => (int?)s.PointsEarned) ?? 0;
+
+            var query = baseQuery
                 .Include(s => s.Customer)
                 .Include(s => s.Cashier)
                 .Include(s => s.Billing)
                 .Include(s => s.Details).ThenInclude(d => d.Medicine)
-                .OrderByDescending(s => s.Id)
-                .ToListAsync();
+                .OrderByDescending(s => s.SaleDate)
+                .ThenByDescending(s => s.Id);
+
+            var sales = await PaginatedList<Sale>.CreateAsync(query, page, pageSize);
             return View(sales);
         }
 

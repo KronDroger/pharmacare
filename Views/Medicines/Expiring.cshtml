@@ -1,40 +1,38 @@
-@model List<CarePlusPharmacy.Models.MedicineBatch>
+@model CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Models.MedicineBatch>
 @{
     ViewData["Title"] = "Expiry Monitoring & Spoilage Prevention";
     var today = DateTime.Today;
 
-    var expiredBatches = Model.Where(b => b.ExpiryDate < today && b.Quantity > 0).ToList();
-    var criticalBatches = Model.Where(b => b.ExpiryDate >= today && b.ExpiryDate <= today.AddDays(30) && b.Quantity > 0).ToList();
-    var warningBatches = Model.Where(b => b.ExpiryDate > today.AddDays(30) && b.ExpiryDate <= today.AddDays(90) && b.Quantity > 0).ToList();
-    var safeBatches = Model.Where(b => b.ExpiryDate > today.AddDays(90) && b.Quantity > 0).ToList();
+    int totalCount = ViewBag.TotalCountAll ?? 0;
+    int expiredCount = ViewBag.ExpiredCount ?? 0;
+    decimal expiredValue = ViewBag.ExpiredValuation ?? 0m;
+    int criticalCount = ViewBag.CriticalCount ?? 0;
+    decimal criticalValue = ViewBag.CriticalValuation ?? 0m;
+    int warningCount = ViewBag.WarningCount ?? 0;
+    decimal warningValue = ViewBag.WarningValuation ?? 0m;
+    int safeCount = ViewBag.SafeCount ?? 0;
+    decimal safeValue = ViewBag.SafeValuation ?? 0m;
+    string currentTab = ViewBag.CurrentTab ?? "all";
 
-    var expiredValue = expiredBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
-    var criticalValue = criticalBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
-    var warningValue = warningBatches.Sum(b => b.Quantity * (b.Medicine?.UnitPrice ?? 0));
+    string BuildTabUrl(string tabName)
+    {
+        var dict = new Dictionary<string, string>();
+        foreach (var key in Context.Request.Query.Keys)
+        {
+            if (!string.IsNullOrEmpty(key) && !key.Equals("tab", StringComparison.OrdinalIgnoreCase) && !key.Equals("page", StringComparison.OrdinalIgnoreCase))
+            {
+                dict[key] = Context.Request.Query[key]!;
+            }
+        }
+        dict["tab"] = tabName;
+        dict["page"] = "1";
+        if (Context.Request.Query.ContainsKey("pageSize"))
+            dict["pageSize"] = Context.Request.Query["pageSize"]!;
+
+        var qs = string.Join("&", dict.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+        return "?" + qs;
+    }
 }
-
-<!-- Expiry Monitoring Header Banner -->
-<div class="card border-0 mb-4 shadow-sm" style="background: linear-gradient(135deg, #1c1917 0%, #292524 100%); border-radius: var(--radius-lg);">
-    <div class="card-body p-4 text-white">
-        <div class="row align-items-center">
-            <div class="col-lg-8">
-                <div class="mb-1 fw-bold" style="color: #f87171; font-size: 13px;">
-                    <i class="bi bi-shield-exclamation me-1"></i> Regulatory Compliance &amp; Tracking
-                </div>
-                <h3 class="fw-bold mb-1">Batch Expiration &amp; Spoilage Prevention</h3>
-                <p class="text-white-50 mb-0" style="font-size: 13.5px;">Proactively track medicine batch lifecycles, eliminate expired stock wastage, and comply with FDA &amp; DOH pharmacy dispensing regulations.</p>
-            </div>
-            <div class="col-lg-4 text-lg-end text-center mt-3 mt-lg-0">
-                <a asp-action="Index" class="btn btn-outline-light me-2">
-                    <i class="bi bi-capsule me-1"></i> Inventory Catalog
-                </a>
-                <button type="button" class="btn btn-accent" onclick="window.print()">
-                    <i class="bi bi-printer me-1"></i> Print Audit Log
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Risk Tier KPI Cards -->
 <div class="d-flex flex-wrap gap-3 mb-4">
@@ -44,7 +42,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Expired Batches</div>
-            <div class="stat-value text-danger">@expiredBatches.Count <span style="font-size: 13px; font-weight: 500; color: #e53935;">(₱@expiredValue.ToString("N2"))</span></div>
+            <div class="stat-value text-danger">@expiredCount <span style="font-size: 13px; font-weight: 500; color: #e53935;">(₱@expiredValue.ToString("N2"))</span></div>
         </div>
         <div class="stat-footer">
             <span class="text-danger fw-bold"><i class="bi bi-shield-slash"></i> Quarantine</span> write-off
@@ -57,7 +55,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Critical (&le; 30 Days)</div>
-            <div class="stat-value text-warning">@criticalBatches.Count <span style="font-size: 13px; font-weight: 500; color: #fb8c00;">(₱@criticalValue.ToString("N2"))</span></div>
+            <div class="stat-value text-warning">@criticalCount <span style="font-size: 13px; font-weight: 500; color: #fb8c00;">(₱@criticalValue.ToString("N2"))</span></div>
         </div>
         <div class="stat-footer">
             <span class="text-warning fw-bold">Priority</span> dispensing required
@@ -70,7 +68,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Warning (31 - 90 Days)</div>
-            <div class="stat-value text-warning">@warningBatches.Count <span style="font-size: 13px; font-weight: 500; color: #7b809a;">batches</span></div>
+            <div class="stat-value text-warning">@warningCount <span style="font-size: 13px; font-weight: 500; color: #7b809a;">batches</span></div>
         </div>
         <div class="stat-footer">
             <span class="text-secondary fw-bold">Monitor</span> next cycle
@@ -83,7 +81,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Healthy Stock (> 90 Days)</div>
-            <div class="stat-value text-success">@safeBatches.Count <span style="font-size: 13px; font-weight: 500; color: #7b809a;">safe</span></div>
+            <div class="stat-value text-success">@safeCount <span style="font-size: 13px; font-weight: 500; color: #7b809a;">safe</span></div>
         </div>
         <div class="stat-footer">
             <span class="text-success fw-bold">Safe</span> shelf lifespan
@@ -91,13 +89,23 @@
     </div>
 </div>
 
-<!-- Filter Pills -->
-<div class="d-flex gap-2 mb-3 no-print">
-    <button type="button" class="btn btn-sm btn-dark" onclick="filterBatches('all')">All Batches (@Model.Count)</button>
-    <button type="button" class="btn btn-sm btn-outline-danger" onclick="filterBatches('expired')">Expired (@expiredBatches.Count)</button>
-    <button type="button" class="btn btn-sm btn-outline-warning" onclick="filterBatches('critical')">Critical &le; 30d (@criticalBatches.Count)</button>
-    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filterBatches('warning')">Warning &le; 90d (@warningBatches.Count)</button>
-    <button type="button" class="btn btn-sm btn-outline-success" onclick="filterBatches('safe')">Safe Stock (@safeBatches.Count)</button>
+<!-- Filter Pills & Toolbar -->
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 no-print">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="@BuildTabUrl("all")" class="btn btn-sm @(currentTab == "all" ? "btn-dark" : "btn-outline-secondary")">All Batches (@totalCount)</a>
+        <a href="@BuildTabUrl("expired")" class="btn btn-sm @(currentTab == "expired" ? "btn-danger" : "btn-outline-danger")">Expired (@expiredCount)</a>
+        <a href="@BuildTabUrl("critical")" class="btn btn-sm @(currentTab == "critical" ? "btn-warning text-dark" : "btn-outline-warning")">Critical &le; 30d (@criticalCount)</a>
+        <a href="@BuildTabUrl("warning")" class="btn btn-sm @(currentTab == "warning" ? "btn-secondary" : "btn-outline-secondary")">Warning &le; 90d (@warningCount)</a>
+        <a href="@BuildTabUrl("safe")" class="btn btn-sm @(currentTab == "safe" ? "btn-success" : "btn-outline-success")">Safe Stock (@safeCount)</a>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+            <i class="bi bi-capsule"></i> Inventory Catalog
+        </a>
+        <button type="button" class="btn btn-sm btn-careplus d-inline-flex align-items-center gap-1" onclick="printAllFiltered()">
+            <i class="bi bi-printer"></i> Print Audit Log
+        </button>
+    </div>
 </div>
 
 <!-- Batch-Level Expiry Ledger -->
@@ -115,9 +123,9 @@
                 <tr>
                     <th>Batch Lot #</th>
                     <th>Medicine / Generic Name</th>
-                    <th>Remaining Qty</th>
-                    <th>Unit Price</th>
-                    <th>Batch Valuation</th>
+                    <th class="num">Remaining Qty (units)</th>
+                    <th class="num">Unit Price</th>
+                    <th class="num">Batch Valuation</th>
                     <th>Expiry Date</th>
                     <th>Status Tier</th>
                     <th class="text-end">Actions</th>
@@ -168,11 +176,11 @@
                             <div class="fw-bold text-dark">@b.Medicine?.Name</div>
                             <div class="text-muted" style="font-size: 11.5px;"><i class="bi bi-capsule me-1"></i>@(b.Medicine?.GenericName ?? "Formula")</div>
                         </td>
-                        <td>
-                            <span class="fw-bold fs-6 @(b.Quantity <= 0 ? "text-muted" : "text-dark")">@b.Quantity units</span>
+                        <td class="num">
+                            <span class="fw-bold fs-6 @(b.Quantity <= 0 ? "text-muted" : "text-dark")">@b.Quantity.ToString("N0")</span>
                         </td>
-                        <td>₱@(b.Medicine?.UnitPrice.ToString("N2") ?? "0.00")</td>
-                        <td>
+                        <td class="num">₱@(b.Medicine?.UnitPrice.ToString("N2") ?? "0.00")</td>
+                        <td class="num">
                             <span class="fw-bold @(days < 0 && b.Quantity > 0 ? "text-danger" : "text-dark")">
                                 ₱@batchValue.ToString("N2")
                             </span>
@@ -233,6 +241,7 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>
 
 <!-- Quarantine / Write-Off Modal -->
@@ -296,6 +305,21 @@
         document.getElementById('modalBatchNumber').value = batchNum;
         document.getElementById('modalBatchInfo').value = `${medName} (${qty} units)`;
         new bootstrap.Modal(document.getElementById('quarantineModal')).show();
+    }
+
+    function printAllFiltered() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('print', 'true');
+        window.open(url.toString(), '_blank');
+    }
+
+    @if (ViewBag.Print == true)
+    {
+        <text>
+        window.addEventListener('load', function() {
+            setTimeout(function() { window.print(); }, 400);
+        });
+        </text>
     }
 </script>
 }

@@ -45,7 +45,7 @@ namespace CarePlusPharmacy.Controllers
             public bool IsExpirySafe { get; set; }
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
             var customers = await _context.Customers
                 .Include(c => c.Sales).ThenInclude(s => s.Details).ThenInclude(d => d.Medicine)
@@ -140,7 +140,15 @@ namespace CarePlusPharmacy.Controllers
             ViewBag.TotalCustomers = customers.Count;
             ViewBag.VipCount = customers.Count(c => c.LoyaltyPoints >= 250);
 
-            return View(customers);
+            var query = _context.Customers
+                .Include(c => c.Sales).ThenInclude(s => s.Details).ThenInclude(d => d.Medicine)
+                .Include(c => c.Prescriptions).ThenInclude(p => p.Details).ThenInclude(d => d.Medicine)
+                .OrderByDescending(c => c.LoyaltyPoints)
+                .ThenBy(c => c.Id);
+
+            var pagedCustomers = await PaginatedList<Customer>.CreateAsync(query, page, pageSize);
+
+            return View(pagedCustomers);
         }
 
         // Send a refill reminder (simulated SMS / Email trigger)

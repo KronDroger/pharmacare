@@ -1,9 +1,10 @@
-@model List<Sale>
+@model CarePlusPharmacy.Models.PaginatedList<Sale>
 @{
     ViewData["Title"] = "Sales & POS Transactions";
-    var totalRevenue = Model.Sum(s => s.TotalAmount);
-    var totalItems = Model.SelectMany(s => s.Details).Sum(d => d.Quantity);
-    var totalPoints = Model.Sum(s => s.PointsEarned);
+    decimal totalRevenue = ViewBag.TotalRevenueAll ?? 0m;
+    int totalCount = ViewBag.TotalCountAll ?? 0;
+    int totalItems = ViewBag.TotalItemsAll ?? 0;
+    int totalPoints = ViewBag.TotalPointsAll ?? 0;
 }
 
 <!-- Summary Statistics -->
@@ -26,7 +27,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Transactions Count</div>
-            <div class="stat-value">@Model.Count</div>
+            <div class="stat-value">@totalCount</div>
         </div>
         <div class="stat-footer">
             <span class="text-info fw-bold"><i class="bi bi-cart-check"></i> Completed</span> orders
@@ -80,7 +81,7 @@
                     <th>Customer &amp; Tier</th>
                     <th>Payment Method</th>
                     <th>Items Dispensed</th>
-                    <th>Net Amount</th>
+                    <th class="num">Net Amount</th>
                     <th>Cashier</th>
                     <th class="text-end">Actions</th>
                 </tr>
@@ -145,7 +146,7 @@
                                 @string.Join(", ", s.Details.Select(d => $"{d.Medicine?.Name} ({d.Quantity})"))
                             </div>
                         </td>
-                        <td>
+                        <td class="num">
                             <div class="fw-bold fs-6 text-dark">₱@s.TotalAmount.ToString("N2")</div>
                             @if (s.DiscountAmount > 0)
                             {
@@ -165,4 +166,5 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>

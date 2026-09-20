@@ -17,14 +17,15 @@ namespace CarePlusPharmacy.Controllers
 
         private bool CanEdit => User.IsInRole("Admin") || User.IsInRole("Cashier");
 
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 10)
         {
             var query = _context.Customers.Include(c => c.Sales).AsQueryable();
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(c => c.FullName.Contains(search));
             ViewBag.Search = search;
             ViewBag.CanEdit = CanEdit;
-            return View(await query.OrderBy(c => c.FullName).ToListAsync());
+            var customers = await PaginatedList<Customer>.CreateAsync(query.OrderBy(c => c.FullName), page, pageSize);
+            return View(customers);
         }
 
         public async Task<IActionResult> Details(int? id)

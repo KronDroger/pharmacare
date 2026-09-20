@@ -17,24 +17,77 @@ namespace CarePlusPharmacy.Controllers
 
         private bool CanEdit => User.IsInRole("Admin") || User.IsInRole("InventoryCoordinator");
 
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 10)
         {
             var query = _context.Medicines.Include(m => m.Supplier).Include(m => m.Batches).AsQueryable();
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(m => m.Name.Contains(search) || m.Category.Contains(search));
 
+            ViewBag.TotalCountAll = await query.CountAsync();
+            ViewBag.TotalUnitsAll = await query.SelectMany(m => m.Batches).SumAsync(b => (int?)b.Quantity) ?? 0;
+            ViewBag.LowStockCountAll = await query.CountAsync(m => m.Batches.Sum(b => b.Quantity) <= m.ReorderLevel);
+            ViewBag.TotalValuationAll = await query.SelectMany(m => m.Batches).SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
             ViewBag.Search = search;
             ViewBag.CanEdit = CanEdit;
-            return View(await query.OrderBy(m => m.Name).ToListAsync());
+
+            var medicines = await PaginatedList<Medicine>.CreateAsync(query.OrderBy(m => m.Name), page, pageSize);
+            return View(medicines);
         }
 
         // Expiry Monitoring — tracks batch-level expiration dates and financial risk
-        public async Task<IActionResult> Expiring()
+        public async Task<IActionResult> Expiring(string? tab, int page = 1, int pageSize = 10, bool print = false)
         {
-            var batches = await _context.MedicineBatches
-                .Include(b => b.Medicine)
-                .OrderBy(b => b.ExpiryDate)
-                .ToListAsync();
+            tab = string.IsNullOrWhiteSpace(tab) ? "all" : tab.ToLower();
+            var today = DateTime.Today;
+
+            var baseQuery = _context.MedicineBatches.Include(b => b.Medicine).AsQueryable();
+
+            // Compute counts and valuations for ALL tabs over full scoped dataset
+            ViewBag.TotalCountAll = await baseQuery.CountAsync();
+
+            var expiredQuery = baseQuery.Where(b => b.ExpiryDate < today && b.Quantity > 0);
+            ViewBag.ExpiredCount = await expiredQuery.CountAsync();
+            ViewBag.ExpiredValuation = await expiredQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
+            var criticalQuery = baseQuery.Where(b => b.ExpiryDate >= today && b.ExpiryDate <= today.AddDays(30) && b.Quantity > 0);
+            ViewBag.CriticalCount = await criticalQuery.CountAsync();
+            ViewBag.CriticalValuation = await criticalQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
+            var warningQuery = baseQuery.Where(b => b.ExpiryDate > today.AddDays(30) && b.ExpiryDate <= today.AddDays(90) && b.Quantity > 0);
+            ViewBag.WarningCount = await warningQuery.CountAsync();
+            ViewBag.WarningValuation = await warningQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
+            var safeQuery = baseQuery.Where(b => b.ExpiryDate > today.AddDays(90) && b.Quantity > 0);
+            ViewBag.SafeCount = await safeQuery.CountAsync();
+            ViewBag.SafeValuation = await safeQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
+            // Filter by selected tab before paging
+            var filteredQuery = tab switch
+            {
+                "expired" => expiredQuery,
+                "critical" => criticalQuery,
+                "warning" => warningQuery,
+                "safe" => safeQuery,
+                _ => baseQuery
+            };
+
+            ViewBag.CurrentTab = tab;
+            ViewBag.Print = print;
+
+            if (print)
+            {
+                var allBatches = await filteredQuery.OrderBy(b => b.ExpiryDate).ThenBy(b => b.Id).ToListAsync();
+                var paginatedList = new PaginatedList<MedicineBatch>(allBatches, allBatches.Count, 1, Math.Max(1, allBatches.Count));
+                return View(paginatedList);
+            }
+
+            var batches = await PaginatedList<MedicineBatch>.CreateAsync(
+                filteredQuery.OrderBy(b => b.ExpiryDate).ThenBy(b => b.Id),
+                page,
+                pageSize
+            );
+
             return View(batches);
         }
 

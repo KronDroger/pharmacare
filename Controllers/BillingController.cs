@@ -1,4 +1,5 @@
 using CarePlusPharmacy.Data;
+using CarePlusPharmacy.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,13 +14,20 @@ namespace CarePlusPharmacy.Controllers
         private readonly ApplicationDbContext _context;
         public BillingController(ApplicationDbContext context) => _context = context;
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
-            var billings = await _context.Billings
+            var baseQuery = _context.Billings.AsQueryable();
+
+            ViewBag.TotalBilledAll = await baseQuery.SumAsync(b => b.AmountDue);
+            ViewBag.TotalPaidAll = await baseQuery.Where(b => b.PaymentStatus == PaymentStatus.Paid).SumAsync(b => b.AmountDue);
+            ViewBag.TotalCountAll = await baseQuery.CountAsync();
+
+            var query = baseQuery
                 .Include(b => b.Sale).ThenInclude(s => s!.Customer)
                 .Include(b => b.Sale).ThenInclude(s => s!.Details).ThenInclude(d => d.Medicine)
-                .OrderByDescending(b => b.DateIssued)
-                .ToListAsync();
+                .OrderByDescending(b => b.DateIssued);
+
+            var billings = await PaginatedList<Billing>.CreateAsync(query, page, pageSize);
             return View(billings);
         }
 

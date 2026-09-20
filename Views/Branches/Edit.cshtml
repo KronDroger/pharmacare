@@ -1,0 +1,31 @@
+@model Branch
+@{ ViewData["Title"] = "Edit Branch"; }
+
+<div class="table-card p-4" style="max-width:520px;">
+    <form asp-action="Edit" method="post">
+        <input type="hidden" asp-for="Id" />
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+        <div class="mb-3">
+            <label class="form-label">Branch Name</label>
+            <input asp-for="Name" class="form-control" required />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Address</label>
+            <input asp-for="Address" class="form-control" required />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Phone</label>
+            <input asp-for="Phone" class="form-control" required />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Opening Hours</label>
+            <input asp-for="OpeningHours" class="form-control" />
+        </div>
+        <div class="form-check mb-3">
+            <input asp-for="IsMainBranch" class="form-check-input" />
+            <label class="form-check-label">This is the main branch</label>
+        </div>
+        <button type="submit" class="btn btn-accent">Save Changes</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>

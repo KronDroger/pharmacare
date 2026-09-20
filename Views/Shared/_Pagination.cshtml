@@ -1,0 +1,132 @@
+@model CarePlusPharmacy.Models.IPaginationInfo
+@if (Model != null)
+{
+    var pageParam = ViewData["PageParam"] as string ?? "page";
+    var pageSizeParam = ViewData["PageSizeParam"] as string ?? "pageSize";
+    var queryParams = ViewContext.HttpContext.Request.Query;
+    string BuildUrl(int pageNum, int? newPageSize = null)
+    {
+        var dict = new Dictionary<string, string>();
+        foreach (var key in queryParams.Keys)
+        {
+            if (!string.IsNullOrEmpty(key) && !key.Equals(pageParam, StringComparison.OrdinalIgnoreCase) && !key.Equals(pageSizeParam, StringComparison.OrdinalIgnoreCase))
+            {
+                dict[key] = queryParams[key]!;
+            }
+        }
+        dict[pageParam] = pageNum.ToString();
+        dict[pageSizeParam] = (newPageSize ?? Model.PageSize).ToString();
+
+        var qs = string.Join("&", dict.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+        return "?" + qs;
+    }
+
+    int start = Model.TotalCount == 0 ? 0 : (Model.PageIndex - 1) * Model.PageSize + 1;
+    int end = Math.Min(Model.PageIndex * Model.PageSize, Model.TotalCount);
+
+    <div class="pagination-wrapper d-flex justify-content-between align-items-center flex-wrap gap-3 p-3 border-top bg-white rounded-bottom">
+        <div class="d-flex align-items-center gap-3 flex-wrap text-muted" style="font-size: 13px;">
+            @if (Model.TotalCount > 0)
+            {
+                <span>Showing <strong class="text-dark">@start–@end</strong> of <strong class="text-dark">@Model.TotalCount</strong> results</span>
+            }
+            else
+            {
+                <span class="text-muted">No records found</span>
+            }
+
+            <div class="d-inline-flex align-items-center gap-1">
+                <label for="pageSizeSelect" style="font-size: 12px;">Rows per page:</label>
+                <select id="pageSizeSelect" class="form-select form-select-sm d-inline-block w-auto" style="font-size: 12.5px; border-radius: 6px;" onchange="location.href = this.value">
+                    @foreach (var size in new[] { 10, 25, 50, 100 })
+                    {
+                        <option value="@BuildUrl(1, size)" selected="@(Model.PageSize == size)">@size</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (Model.TotalCount > 0 && Model.TotalPages > 1)
+        {
+            int total = Model.TotalPages;
+            int current = Model.PageIndex;
+
+            var pages = new List<int>();
+            if (total <= 7)
+            {
+                for (int i = 1; i <= total; i++) pages.Add(i);
+            }
+            else
+            {
+                pages.Add(1);
+                int startPage = Math.Max(2, current - 1);
+                int endPage = Math.Min(total - 1, current + 1);
+
+                if (current <= 4)
+                {
+                    startPage = 2;
+                    endPage = 5;
+                }
+                else if (current >= total - 3)
+                {
+                    startPage = total - 4;
+                    endPage = total - 1;
+                }
+
+                if (startPage > 2) pages.Add(-1); // ellipsis
+                for (int i = startPage; i <= endPage; i++) pages.Add(i);
+                if (endPage < total - 1) pages.Add(-2); // ellipsis
+                pages.Add(total);
+            }
+
+            <nav aria-label="Page navigation">
+                <ul class="pagination pagination-sm mb-0">
+                    <!-- First Page -->
+                    <li class="page-item @(Model.HasPreviousPage ? "" : "disabled")">
+                        <a class="page-link" href="@(Model.HasPreviousPage ? BuildUrl(1) : "#")" aria-label="First" title="First Page">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+
+                    <!-- Previous Page -->
+                    <li class="page-item @(Model.HasPreviousPage ? "" : "disabled")">
+                        <a class="page-link" href="@(Model.HasPreviousPage ? BuildUrl(current - 1) : "#")" aria-label="Previous" title="Previous Page">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+
+                    <!-- Numbered Pages with Ellipsis -->
+                    @foreach (var p in pages)
+                    {
+                        if (p < 0)
+                        {
+                            <li class="page-item disabled">
+                                <span class="page-link">&hellip;</span>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="page-item @(p == current ? "active" : "")">
+                                <a class="page-link" href="@BuildUrl(p)">@p</a>
+                            </li>
+                        }
+                    }
+
+                    <!-- Next Page -->
+                    <li class="page-item @(Model.HasNextPage ? "" : "disabled")">
+                        <a class="page-link" href="@(Model.HasNextPage ? BuildUrl(current + 1) : "#")" aria-label="Next" title="Next Page">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+
+                    <!-- Last Page -->
+                    <li class="page-item @(Model.HasNextPage ? "" : "disabled")">
+                        <a class="page-link" href="@(Model.HasNextPage ? BuildUrl(total) : "#")" aria-label="Last" title="Last Page">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+}

@@ -1,0 +1,36 @@
+@model List<SubscriptionPlan>
+@{ ViewData["Title"] = "Available Refill Plans"; }
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-arrow-repeat text-success me-2"></i>Available Refill Plans</div>
+            <div class="text-muted" style="font-size: 12px;">Subscribe to a maintenance medication for automatic refills</div>
+        </div>
+        <a asp-action="MySubscriptions" class="btn btn-sm btn-outline-careplus">My Subscriptions</a>
+    </div>
+
+    <div class="p-3">
+        <div class="row g-3">
+            @if (!Model.Any())
+            {
+                <div class="col-12 text-center text-muted py-5">No refill plans are available right now.</div>
+            }
+            @foreach (var p in Model)
+            {
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100 d-flex flex-column">
+                        <div class="fw-bold">@p.Name</div>
+                        <div class="text-muted" style="font-size: 12.5px;">@p.Medicine?.Name — @p.Quantity unit(s) every @p.IntervalDays days</div>
+                        <div class="fs-5 fw-bold text-success mt-2">₱@p.Price.ToString("N2") <span class="fs-6 text-muted fw-normal">/ refill</span></div>
+                        <form asp-action="Subscribe" method="post" class="mt-auto pt-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="planId" value="@p.Id" />
+                            <button type="submit" class="btn btn-careplus w-100">Subscribe</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

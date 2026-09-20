@@ -1,4 +1,4 @@
-@model List<Customer>
+@model CarePlusPharmacy.Models.PaginatedList<Customer>
 @{
     ViewData["Title"] = "Customer Management & Directory";
     bool canEdit = ViewBag.CanEdit;
@@ -33,11 +33,11 @@
                 <tr>
                     <th>Patient / Full Name</th>
                     <th>CRM Tier</th>
-                    <th>Loyalty Points</th>
+                    <th class="num">Loyalty Points</th>
                     <th>Contact Phone</th>
                     <th>Email Address</th>
-                    <th>Lifetime Spend</th>
-                    <th>Orders</th>
+                    <th class="num">Lifetime Spend</th>
+                    <th class="num">Orders</th>
                     @if (canEdit)
                     {
                         <th class="text-end">Actions</th>
@@ -82,8 +82,8 @@
                                 <span class="badge-tier-bronze">@c.Tier</span>
                             }
                         </td>
-                        <td>
-                            <span class="fw-bold text-success fs-6">@c.LoyaltyPoints pts</span>
+                        <td class="num">
+                            <span class="fw-bold text-success fs-6">@c.LoyaltyPoints.ToString("N0") pts</span>
                         </td>
                         <td>
                             <a href="tel:@c.Phone" class="text-decoration-none text-dark">
@@ -93,11 +93,11 @@
                         <td>
                             <span class="text-muted" style="font-size: 12.5px;">@(c.Email ?? "—")</span>
                         </td>
-                        <td>
+                        <td class="num">
                             <span class="fw-bold text-dark">₱@totalSpent.ToString("N2")</span>
                         </td>
-                        <td>
-                            <span class="text-muted fw-semibold">@c.Sales.Count order(s)</span>
+                        <td class="num">
+                            <span class="text-muted fw-semibold">@c.Sales.Count.ToString("N0")</span>
                         </td>
                         @if (canEdit)
                         {
@@ -118,4 +118,5 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>

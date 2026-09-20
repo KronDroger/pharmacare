@@ -1,4 +1,4 @@
-@model List<Supplier>
+@model CarePlusPharmacy.Models.PaginatedList<Supplier>
 @{ ViewData["Title"] = "Suppliers"; }
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -26,4 +26,5 @@
             }
         </tbody>
     </table>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>

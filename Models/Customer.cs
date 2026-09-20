@@ -19,6 +19,16 @@ namespace CarePlusPharmacy.Models
         [StringLength(200)]
         public string? Address { get; set; }
 
+        [StringLength(80)]
+        public string? City { get; set; }
+
+        [DataType(DataType.Date)]
+        [Display(Name = "Date of Birth")]
+        public DateTime? DateOfBirth { get; set; }
+
+        [StringLength(30)]
+        public string? Gender { get; set; }
+
         [Display(Name = "Loyalty Points")]
         public int LoyaltyPoints { get; set; } = 0;
 

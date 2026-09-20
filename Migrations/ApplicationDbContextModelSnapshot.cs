@@ -89,6 +89,54 @@ namespace CarePlusPharmacy.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("CarePlusPharmacy.Models.AuditLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("UserRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("CarePlusPharmacy.Models.Billing", b =>
                 {
                     b.Property<int>("Id")
@@ -103,11 +151,18 @@ namespace CarePlusPharmacy.Migrations
                     b.Property<decimal>("AmountPaid")
                         .HasColumnType("decimal(10,2)");
 
+                    b.Property<decimal>("ChangeAmount")
+                        .HasColumnType("decimal(10,2)");
+
                     b.Property<DateTime>("DateIssued")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("PaymentMethod")
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
@@ -125,6 +180,41 @@ namespace CarePlusPharmacy.Migrations
                     b.ToTable("Billings");
                 });
 
+            modelBuilder.Entity("CarePlusPharmacy.Models.Branch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<bool>("IsMainBranch")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("OpeningHours")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Branches");
+                });
+
             modelBuilder.Entity("CarePlusPharmacy.Models.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -136,6 +226,13 @@ namespace CarePlusPharmacy.Migrations
                     b.Property<string>("Address")
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime>("DateRegistered")
                         .HasColumnType("datetime(6)");
@@ -149,6 +246,13 @@ namespace CarePlusPharmacy.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
+                    b.Property<string>("Gender")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<int>("LoyaltyPoints")
+                        .HasColumnType("int");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -157,6 +261,42 @@ namespace CarePlusPharmacy.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("CarePlusPharmacy.Models.CustomerSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("NextRefillDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubscriptionPlanId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.ToTable("CustomerSubscriptions");
                 });
 
             modelBuilder.Entity("CarePlusPharmacy.Models.Medicine", b =>
@@ -175,6 +315,14 @@ namespace CarePlusPharmacy.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(400)
                         .HasColumnType("varchar(400)");
+
+                    b.Property<string>("GenericName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -266,6 +414,10 @@ namespace CarePlusPharmacy.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Dosage")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<int>("MedicineId")
                         .HasColumnType("int");
 
@@ -351,6 +503,23 @@ namespace CarePlusPharmacy.Migrations
                     b.Property<int?>("CustomerId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CustomerSubscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<int>("PointsEarned")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PointsRedeemed")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("SaleDate")
                         .HasColumnType("datetime(6)");
 
@@ -359,6 +528,8 @@ namespace CarePlusPharmacy.Migrations
                     b.HasIndex("CashierId");
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("CustomerSubscriptionId");
 
                     b.ToTable("Sales");
                 });
@@ -370,6 +541,9 @@ namespace CarePlusPharmacy.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
 
                     b.Property<int>("MedicineId")
                         .HasColumnType("int");
@@ -385,11 +559,48 @@ namespace CarePlusPharmacy.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BatchId");
+
                     b.HasIndex("MedicineId");
 
                     b.HasIndex("SaleId");
 
                     b.ToTable("SaleDetails");
+                });
+
+            modelBuilder.Entity("CarePlusPharmacy.Models.SubscriptionPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("IntervalDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("MedicineId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicineId");
+
+                    b.ToTable("SubscriptionPlans");
                 });
 
             modelBuilder.Entity("CarePlusPharmacy.Models.Supplier", b =>
@@ -566,6 +777,25 @@ namespace CarePlusPharmacy.Migrations
                     b.Navigation("Sale");
                 });
 
+            modelBuilder.Entity("CarePlusPharmacy.Models.CustomerSubscription", b =>
+                {
+                    b.HasOne("CarePlusPharmacy.Models.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CarePlusPharmacy.Models.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("SubscriptionPlan");
+                });
+
             modelBuilder.Entity("CarePlusPharmacy.Models.Medicine", b =>
                 {
                     b.HasOne("CarePlusPharmacy.Models.Supplier", "Supplier")
@@ -660,6 +890,10 @@ namespace CarePlusPharmacy.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("CarePlusPharmacy.Models.CustomerSubscription", null)
+                        .WithMany("RefillSales")
+                        .HasForeignKey("CustomerSubscriptionId");
+
                     b.Navigation("Cashier");
 
                     b.Navigation("Customer");
@@ -667,6 +901,11 @@ namespace CarePlusPharmacy.Migrations
 
             modelBuilder.Entity("CarePlusPharmacy.Models.SaleDetail", b =>
                 {
+                    b.HasOne("CarePlusPharmacy.Models.MedicineBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("CarePlusPharmacy.Models.Medicine", "Medicine")
                         .WithMany()
                         .HasForeignKey("MedicineId")
@@ -679,9 +918,22 @@ namespace CarePlusPharmacy.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Batch");
+
                     b.Navigation("Medicine");
 
                     b.Navigation("Sale");
+                });
+
+            modelBuilder.Entity("CarePlusPharmacy.Models.SubscriptionPlan", b =>
+                {
+                    b.HasOne("CarePlusPharmacy.Models.Medicine", "Medicine")
+                        .WithMany()
+                        .HasForeignKey("MedicineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Medicine");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -742,6 +994,11 @@ namespace CarePlusPharmacy.Migrations
                     b.Navigation("Sales");
                 });
 
+            modelBuilder.Entity("CarePlusPharmacy.Models.CustomerSubscription", b =>
+                {
+                    b.Navigation("RefillSales");
+                });
+
             modelBuilder.Entity("CarePlusPharmacy.Models.Medicine", b =>
                 {
                     b.Navigation("Batches");
@@ -762,6 +1019,11 @@ namespace CarePlusPharmacy.Migrations
                     b.Navigation("Billing");
 
                     b.Navigation("Details");
+                });
+
+            modelBuilder.Entity("CarePlusPharmacy.Models.SubscriptionPlan", b =>
+                {
+                    b.Navigation("Subscriptions");
                 });
 
             modelBuilder.Entity("CarePlusPharmacy.Models.Supplier", b =>

@@ -1,3 +1,4 @@
+using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
 using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -11,15 +12,18 @@ namespace CarePlusPharmacy.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IRecaptchaService _recaptchaService;
+        private readonly ApplicationDbContext _context;
 
         public AccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
-            IRecaptchaService recaptchaService)
+            IRecaptchaService recaptchaService,
+            ApplicationDbContext context)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _recaptchaService = recaptchaService;
+            _context = context;
         }
 
         [HttpGet]
@@ -35,7 +39,6 @@ namespace CarePlusPharmacy.Controllers
         {
             ViewData["ReturnUrl"] = returnUrl;
 
-            // 1. Verify reCAPTCHA token
             var recaptchaToken = Request.Form["g-recaptcha-response"].ToString();
             var recaptchaResult = await _recaptchaService.VerifyTokenAsync(recaptchaToken, HttpContext.Connection.RemoteIpAddress?.ToString());
             if (!recaptchaResult.Success)
@@ -50,7 +53,6 @@ namespace CarePlusPharmacy.Controllers
                 return View();
             }
 
-            // 2. Check if user account has been deactivated by administrator
             var user = await _userManager.FindByEmailAsync(email);
             if (user != null && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
             {
@@ -85,14 +87,15 @@ namespace CarePlusPharmacy.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(string fullName, string email, string password)
+        public async Task<IActionResult> Register(
+            string fullName, string email, string password,
+            string phone, string? address, string? city,
+            DateTime? dateOfBirth, string? gender)
         {
-            // Public self-registration is intended for the Customer role only.
-            // Staff accounts (Admin / Pharmacist / Cashier / InventoryCoordinator)
-            // should be created by the Main Admin via User Management.
-            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email)
+                || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(phone))
             {
-                ModelState.AddModelError(string.Empty, "All fields are required.");
+                ModelState.AddModelError(string.Empty, "Full name, email, phone, and password are required.");
                 return View();
             }
 
@@ -102,6 +105,21 @@ namespace CarePlusPharmacy.Controllers
             if (result.Succeeded)
             {
                 await _userManager.AddToRoleAsync(user, "Customer");
+
+                var customer = new Customer
+                {
+                    FullName = fullName,
+                    Email = email,
+                    Phone = phone,
+                    Address = address,
+                    City = city,
+                    DateOfBirth = dateOfBirth,
+                    Gender = gender,
+                    DateRegistered = DateTime.Today
+                };
+                _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+
                 await _signInManager.SignInAsync(user, isPersistent: false);
                 return RedirectToAction("Index", "Home");
             }

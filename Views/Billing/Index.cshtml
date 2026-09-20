@@ -1,8 +1,9 @@
-@model List<Billing>
+@model CarePlusPharmacy.Models.PaginatedList<Billing>
 @{
     ViewData["Title"] = "Billing & Official Invoices";
-    var totalBilled = Model.Sum(b => b.AmountDue);
-    var totalPaid = Model.Where(b => b.PaymentStatus == PaymentStatus.Paid).Sum(b => b.AmountDue);
+    decimal totalBilled = ViewBag.TotalBilledAll ?? 0m;
+    decimal totalPaid = ViewBag.TotalPaidAll ?? 0m;
+    int totalCount = ViewBag.TotalCountAll ?? 0;
 }
 
 <!-- Billing KPI Summary -->
@@ -37,7 +38,7 @@
         </div>
         <div class="stat-content">
             <div class="stat-label">Total Invoices Issued</div>
-            <div class="stat-value">@Model.Count</div>
+            <div class="stat-value">@totalCount</div>
         </div>
         <div class="stat-footer">
             <span class="text-primary fw-bold">100%</span> officially recorded
@@ -64,9 +65,9 @@
                     <th>Date Issued</th>
                     <th>Customer / Patient</th>
                     <th>Payment Method</th>
-                    <th>Amount Due</th>
-                    <th>Amount Paid</th>
-                    <th>Change</th>
+                    <th class="num">Amount Due</th>
+                    <th class="num">Amount Paid</th>
+                    <th class="num">Change</th>
                     <th>Status</th>
                     <th class="text-end">Action</th>
                 </tr>
@@ -97,11 +98,11 @@
                         <td>
                             <span class="text-muted fw-semibold">@b.PaymentMethod</span>
                         </td>
-                        <td>
+                        <td class="num">
                             <span class="fw-bold text-dark fs-6">₱@b.AmountDue.ToString("N2")</span>
                         </td>
-                        <td>₱@b.AmountPaid.ToString("N2")</td>
-                        <td>
+                        <td class="num">₱@b.AmountPaid.ToString("N2")</td>
+                        <td class="num">
                             @if (b.ChangeAmount > 0)
                             {
                                 <span class="text-muted" style="font-size: 12px;">₱@b.ChangeAmount.ToString("N2")</span>
@@ -135,4 +136,5 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>

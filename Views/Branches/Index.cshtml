@@ -1,0 +1,69 @@
+@model CarePlusPharmacy.Models.PaginatedList<Branch>
+@{ ViewData["Title"] = "Branches"; }
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-geo-alt-fill text-success me-2"></i>CarePlus Branches</div>
+            <div class="text-muted" style="font-size: 12px;">Find a branch near you for pickup, prescriptions, or subscription refills</div>
+        </div>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-action="Create" class="btn btn-sm btn-careplus d-inline-flex align-items-center gap-1">
+                <i class="bi bi-plus-lg"></i> Add Branch
+            </a>
+        }
+    </div>
+
+    <div class="p-3">
+        <div class="row g-3">
+            @if (!Model.Any())
+            {
+                <div class="col-12 text-center text-muted py-5">No branches added yet.</div>
+            }
+            @foreach (var b in Model)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="border rounded overflow-hidden h-100 d-flex flex-column">
+                        <iframe
+                            src="https://maps.google.com/maps?q=@Uri.EscapeDataString(b.Address)&output=embed"
+                            width="100%" height="180" style="border:0;" loading="lazy">
+                        </iframe>
+                        <div class="p-3 d-flex flex-column flex-grow-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="fw-bold">@b.Name</div>
+                                @if (b.IsMainBranch)
+                                {
+                                    <span class="badge bg-success">Main</span>
+                                }
+                            </div>
+                            <div class="text-muted mt-1" style="font-size: 12.5px;">
+                                <i class="bi bi-geo-alt me-1"></i>@b.Address
+                            </div>
+                            <div class="text-muted" style="font-size: 12.5px;">
+                                <i class="bi bi-telephone me-1"></i>@b.Phone
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(b.OpeningHours))
+                            {
+                                <div class="text-muted" style="font-size: 12.5px;">
+                                    <i class="bi bi-clock me-1"></i>@b.OpeningHours
+                                </div>
+                            }
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <div class="mt-auto pt-2 d-flex gap-2">
+                                    <a asp-action="Edit" asp-route-id="@b.Id" class="btn btn-sm btn-outline-careplus">Edit</a>
+                                    <form asp-action="Delete" asp-route-id="@b.Id" method="post" onsubmit="return confirm('Remove this branch?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    @await Html.PartialAsync("_Pagination", Model)
+</div>

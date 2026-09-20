@@ -84,7 +84,8 @@ namespace CarePlusPharmacy.Data
                     new() { FullName = "Juan Dela Cruz", Phone = "0918-222-1111", Email = "juan.delacruz@mail.com", Address = "Agdao, Davao City", LoyaltyPoints = 320, DateRegistered = DateTime.Today.AddMonths(-6) },
                     new() { FullName = "Maria Santos", Phone = "0918-333-2222", Email = "maria.santos@mail.com", Address = "Buhangin, Davao City", LoyaltyPoints = 145, DateRegistered = DateTime.Today.AddMonths(-4) },
                     new() { FullName = "Ricardo Tan", Phone = "0919-444-5555", Email = "ricardo.tan@mail.com", Address = "Matina, Davao City", LoyaltyPoints = 580, DateRegistered = DateTime.Today.AddYears(-1) },
-                    new() { FullName = "Elena Villanueva", Phone = "0920-666-7777", Email = "elena.v@mail.com", Address = "Toril, Davao City", LoyaltyPoints = 65, DateRegistered = DateTime.Today.AddMonths(-1) }
+                    new() { FullName = "Elena Villanueva", Phone = "0920-666-7777", Email = "elena.v@mail.com", Address = "Toril, Davao City", LoyaltyPoints = 65, DateRegistered = DateTime.Today.AddMonths(-1) },
+                    new() { FullName = "Customer User", Phone = "0921-000-0000", Email = "customer@careplus.ph", Address = "Davao City", LoyaltyPoints = 0, DateRegistered = DateTime.Today }
                 };
                 context.Customers.AddRange(customers);
                 await context.SaveChangesAsync();

@@ -1,4 +1,4 @@
-@model List<CarePlusPharmacy.Models.Customer>
+@model CarePlusPharmacy.Models.PaginatedList<CarePlusPharmacy.Models.Customer>
 @{
     ViewData["Title"] = "Customer CRM & Loyalty Program";
     var refillAlerts = ViewBag.RefillAlerts as List<CarePlusPharmacy.Controllers.CrmController.RefillAlertViewModel> ?? new();
@@ -8,27 +8,14 @@
     int vipCount = ViewBag.VipCount ?? 0;
 }
 
-<!-- CRM Header Banner -->
-<div class="card border-0 mb-4 shadow-sm" style="background: linear-gradient(135deg, #0b382e 0%, #165647 100%); border-radius: var(--radius-lg);">
-    <div class="card-body p-4 text-white">
-        <div class="row align-items-center">
-            <div class="col-lg-8">
-                <div class="mb-1 fw-bold" style="color: #6ee7b7; font-size: 13px;">
-                    <i class="bi bi-heart-pulse-fill me-1"></i> Patient Relationship Management
-                </div>
-                <h3 class="fw-bold mb-1">Patient Engagement &amp; Loyalty Hub</h3>
-                <p class="text-white-50 mb-0" style="font-size: 13.5px;">Track customer loyalty points, manage VIP tiers, automate chronic medication refill reminders, and maintain expiry-safe product recommendations.</p>
-            </div>
-            <div class="col-lg-4 text-lg-end text-center mt-3 mt-lg-0">
-                <a asp-controller="Customers" asp-action="Create" class="btn btn-accent me-2">
-                    <i class="bi bi-person-plus-fill me-1"></i> Add Patient
-                </a>
-                <a asp-controller="Sales" asp-action="Create" class="btn btn-outline-light">
-                    <i class="bi bi-cart3 me-1"></i> POS Checkout
-                </a>
-            </div>
-        </div>
-    </div>
+<!-- CRM Page Toolbar -->
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+    <a asp-controller="Customers" asp-action="Create" class="btn btn-sm btn-accent d-inline-flex align-items-center gap-1">
+        <i class="bi bi-person-plus-fill"></i> Add Patient
+    </a>
+    <a asp-controller="Sales" asp-action="Create" class="btn btn-sm btn-outline-careplus d-inline-flex align-items-center gap-1">
+        <i class="bi bi-cart3"></i> POS Checkout
+    </a>
 </div>
 
 <!-- CRM KPI Metrics -->
@@ -219,8 +206,8 @@
                 <tr>
                     <th>Patient / Customer</th>
                     <th>CRM Tier</th>
-                    <th>Loyalty Points</th>
-                    <th>Purchase History</th>
+                    <th class="num">Loyalty Points</th>
+                    <th class="num">Purchase History</th>
                     <th>Registered</th>
                     <th class="text-end">Actions</th>
                 </tr>
@@ -257,11 +244,11 @@
                                 <span class="badge-tier-bronze">🏷️ @c.Tier</span>
                             }
                         </td>
-                        <td>
+                        <td class="num">
                             <div class="fw-bold fs-6 text-success">@c.LoyaltyPoints.ToString("N0") <span style="font-size: 12px; font-weight: 500;">pts</span></div>
                             <div class="text-muted" style="font-size: 11px;">Value: ₱@c.LoyaltyPoints.ToString("N2") discount</div>
                         </td>
-                        <td>
+                        <td class="num">
                             <span class="badge bg-light text-dark border">@c.Sales.Count order(s)</span>
                             <div class="text-muted" style="font-size: 11px;">
                                 Spent: ₱@(c.Sales.Sum(s => s.TotalAmount).ToString("N2"))
@@ -282,6 +269,7 @@
             </tbody>
         </table>
     </div>
+    @await Html.PartialAsync("_Pagination", Model)
 </div>
 
 <!-- Award Bonus Points Modal -->
@@ -304,7 +292,7 @@
                         <label class="form-label fw-semibold" style="font-size: 13px;">Points to Award</label>
                         <div class="input-group">
                             <span class="input-group-text bg-white"><i class="bi bi-star-fill text-warning"></i></span>
-                            <input type="number" name="points" class="form-control" placeholder="e.g. 50" min="1" required />
+                            <input type="number" name="points" class="form-control num" placeholder="e.g. 50" min="1" required />
                         </div>
                     </div>
                     <div class="mb-3">

@@ -29,7 +29,7 @@ namespace CarePlusPharmacy.Controllers
             public int LoyaltyPoints { get; set; }
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int medPage = 1, int medPageSize = 10, int custPage = 1, int custPageSize = 10, bool print = false)
         {
             var sales = await _context.Sales
                 .Include(s => s.Customer)
@@ -71,8 +71,8 @@ namespace CarePlusPharmacy.Controllers
                 .Select(g => new { Month = g.Key, Total = g.Sum(s => s.TotalAmount) })
                 .ToList();
 
-            // Top-Selling Medicines
-            var topMeds = sales.SelectMany(s => s.Details)
+            // Top-Selling Medicines (Paginated)
+            var topMedsQuery = sales.SelectMany(s => s.Details)
                 .GroupBy(d => d.Medicine?.Name ?? "Unknown")
                 .Select(g => new TopSellerReportItem
                 {
@@ -81,12 +81,12 @@ namespace CarePlusPharmacy.Controllers
                     UnitsSold = g.Sum(d => d.Quantity),
                     Revenue = g.Sum(d => d.Quantity * d.UnitPrice)
                 })
-                .OrderByDescending(t => t.Revenue)
-                .Take(6)
-                .ToList();
+                .OrderByDescending(t => t.Revenue);
 
-            // Top Spending Customers (CRM)
-            var topCustomers = customers
+            var topMeds = Models.PaginatedList<TopSellerReportItem>.Create(topMedsQuery, medPage, medPageSize);
+
+            // Top Spending Customers (CRM) (Paginated)
+            var topCustomersQuery = customers
                 .Select(c => new TopCustomerReportItem
                 {
                     CustomerName = c.FullName,
@@ -95,9 +95,18 @@ namespace CarePlusPharmacy.Controllers
                     TotalSpent = c.Sales.Sum(s => s.TotalAmount),
                     LoyaltyPoints = c.LoyaltyPoints
                 })
-                .OrderByDescending(c => c.TotalSpent)
-                .Take(5)
-                .ToList();
+                .OrderByDescending(c => c.TotalSpent);
+
+            var topCustomers = Models.PaginatedList<TopCustomerReportItem>.Create(topCustomersQuery, custPage, custPageSize);
+
+            ViewBag.Print = print;
+            if (print)
+            {
+                var topMedsList = topMedsQuery.ToList();
+                var topCustomersList = topCustomersQuery.ToList();
+                topMeds = new Models.PaginatedList<TopSellerReportItem>(topMedsList, topMedsList.Count, 1, Math.Max(1, topMedsList.Count));
+                topCustomers = new Models.PaginatedList<TopCustomerReportItem>(topCustomersList, topCustomersList.Count, 1, Math.Max(1, topCustomersList.Count));
+            }
 
             ViewBag.TotalRevenue = totalRevenue;
             ViewBag.InventoryValue = inventoryValuation;
