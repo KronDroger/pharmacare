@@ -1350,13 +1350,15 @@ html.sidebar-pre-collapsed .app-shell .sidebar .brand {
 }
 
 /* ---------- Numeric Alignment System ---------- */
-th.num, td.num {
+th.num,
+td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   padding-right: 20px;
 }
 
-input.num, .form-control.num {
+input.num,
+.form-control.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
