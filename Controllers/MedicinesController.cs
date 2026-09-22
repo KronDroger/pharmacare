@@ -137,7 +137,7 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,InventoryCoordinator")]
-        public async Task<IActionResult> Create([Bind("Name,GenericName,Category,Manufacturer,Description,UnitPrice,ReorderLevel,SupplierId,IsVatExempt")] Medicine medicine)
+        public async Task<IActionResult> Create([Bind("Name,GenericName,Category,Manufacturer,Description,UnitPrice,ReorderLevel,SupplierId,IsVatExempt,RxRequired")] Medicine medicine)
         {
             if (ModelState.IsValid)
             {
@@ -163,7 +163,7 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,InventoryCoordinator")]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,GenericName,Category,Manufacturer,Description,UnitPrice,ReorderLevel,SupplierId,IsVatExempt")] Medicine medicine)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,GenericName,Category,Manufacturer,Description,UnitPrice,ReorderLevel,SupplierId,IsVatExempt,RxRequired")] Medicine medicine)
         {
             if (id != medicine.Id) return NotFound();
 

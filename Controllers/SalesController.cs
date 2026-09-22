@@ -148,7 +148,8 @@ namespace CarePlusPharmacy.Controllers
                 sellableStock = m.SellableStock,
                 expiredStock = m.ExpiredStock,
                 nearestExpiry = m.NearestExpiry?.ToString("yyyy-MM-dd"),
-                isVatExempt = m.IsVatExempt
+                isVatExempt = m.IsVatExempt,
+                rxRequired = m.RxRequired
             }).ToList();
 
             return Json(new
@@ -278,6 +279,73 @@ namespace CarePlusPharmacy.Controllers
                     }
                 }
 
+                // ---- Prescription (Rx) enforcement ----
+                // Rx-Required medicines may only be dispensed with a linked,
+                // customer-owned, pending prescription and pharmacist/admin verification.
+                Prescription? rxForSale = null;
+                var rxRequiredItems = requestedItems
+                    .Where(i => medicines.Any(m => m.Id == i.MedicineId && m.RxRequired))
+                    .ToList();
+
+                if (rxRequiredItems.Any() || (model.PrescriptionId.HasValue && model.PrescriptionId.Value > 0))
+                {
+                    if (!(User.IsInRole("Pharmacist") || User.IsInRole("Admin")))
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = "Only a Pharmacist or Admin can dispense prescription (Rx) medicines." });
+                    }
+
+                    if (!(model.PrescriptionId.HasValue && model.PrescriptionId.Value > 0))
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = "This medicine requires a prescription. Dispense it via the Prescriptions module using 'Dispense (POS)'." });
+                    }
+
+                    if (!(model.CustomerId.HasValue && model.CustomerId.Value > 0))
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = "A linked customer is required when dispensing with a prescription." });
+                    }
+
+                    var rx = await _context.Prescriptions
+                        .Include(p => p.Details)
+                        .FirstOrDefaultAsync(p => p.Id == model.PrescriptionId.Value);
+
+                    if (rx == null)
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = "Prescription not found." });
+                    }
+                    if (rx.CustomerId != model.CustomerId.Value)
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = "This prescription does not belong to the selected customer." });
+                    }
+                    if (rx.Status != PrescriptionStatus.Pending)
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new { success = false, message = $"This prescription is already {rx.Status} and cannot be dispensed again." });
+                    }
+
+                    foreach (var item in rxRequiredItems)
+                    {
+                        var med = medicines.First(m => m.Id == item.MedicineId);
+                        var rxLine = rx.Details.FirstOrDefault(pd => pd.MedicineId == item.MedicineId);
+                        if (rxLine == null)
+                        {
+                            await tx.RollbackAsync();
+                            return BadRequest(new { success = false, message = $"{med.Name} is not on prescription #{rx.Id}." });
+                        }
+                        if (item.Quantity > rxLine.Quantity)
+                        {
+                            await tx.RollbackAsync();
+                            return BadRequest(new { success = false, message = $"Quantity for {med.Name} exceeds the prescribed amount ({rxLine.Quantity})." });
+                        }
+                    }
+
+                    rxForSale = rx;
+                }
+
                 // Price the sale (server-side VAT + statutory discount) — the client
                 // never dictates totals.
                 var priceLines = saleDetails.Select(d =>
@@ -352,14 +420,11 @@ namespace CarePlusPharmacy.Controllers
                 };
                 _context.Billings.Add(billing);
 
-                // If attached to a prescription, mark it fulfilled
-                if (model.PrescriptionId.HasValue && model.PrescriptionId.Value > 0)
+                // If attached to a prescription, mark it fulfilled (validated above)
+                if (rxForSale != null)
                 {
-                    var rx = await _context.Prescriptions.FindAsync(model.PrescriptionId.Value);
-                    if (rx != null)
-                    {
-                        rx.Status = PrescriptionStatus.Fulfilled;
-                    }
+                    rxForSale.Status = PrescriptionStatus.Fulfilled;
+                    rxForSale.SaleId = sale.Id;
                 }
 
                 // Record compliance audit log

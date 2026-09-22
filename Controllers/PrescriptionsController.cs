@@ -1,6 +1,7 @@
 using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,13 @@ namespace CarePlusPharmacy.Controllers
     public class PrescriptionsController : Controller
     {
         private readonly ApplicationDbContext _context;
-        public PrescriptionsController(ApplicationDbContext context) => _context = context;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public PrescriptionsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        {
+            _context = context;
+            _userManager = userManager;
+        }
 
         public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
@@ -64,36 +71,114 @@ namespace CarePlusPharmacy.Controllers
 
             _context.Prescriptions.Add(prescription);
             await _context.SaveChangesAsync();
+            await LogAuditAsync("PRESCRIPTION_CREATED", $"Recorded prescription #{prescription.Id} for {prescription.DoctorName} (medicine ID {medicineId}, qty {quantity}).");
             TempData["Success"] = "Prescription successfully recorded.";
             return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleStatus(int id)
+        public async Task<IActionResult> Fulfill(int id)
         {
             var rx = await _context.Prescriptions.FindAsync(id);
-            if (rx != null)
+            if (rx == null) return NotFound();
+
+            if (rx.Status != PrescriptionStatus.Pending)
             {
-                rx.Status = rx.Status == PrescriptionStatus.Fulfilled
-                    ? PrescriptionStatus.Pending
-                    : PrescriptionStatus.Fulfilled;
-                await _context.SaveChangesAsync();
+                TempData["Error"] = $"Only pending prescriptions can be fulfilled. This prescription is {rx.Status}.";
+                return RedirectToAction(nameof(Index));
             }
+
+            rx.Status = PrescriptionStatus.Fulfilled;
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("PRESCRIPTION_FULFILLED", $"Fulfilled prescription #{rx.Id} (patient ID {rx.CustomerId}).");
+            TempData["Success"] = "Prescription marked as fulfilled.";
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost, ActionName("Delete")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> Reopen(int id)
         {
             var rx = await _context.Prescriptions.FindAsync(id);
-            if (rx != null)
+            if (rx == null) return NotFound();
+
+            // Fulfilled → Pending requires an Admin override (pharmacists cannot
+            // silently flip an already-dispensed prescription back).
+            if (!User.IsInRole("Admin"))
             {
-                _context.Prescriptions.Remove(rx);
-                await _context.SaveChangesAsync();
+                TempData["Error"] = "Only an Admin can reopen a fulfilled prescription.";
+                return RedirectToAction(nameof(Index));
             }
+
+            if (rx.Status == PrescriptionStatus.Cancelled)
+            {
+                TempData["Error"] = "Cancelled prescriptions cannot be reopened.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (rx.Status != PrescriptionStatus.Fulfilled)
+            {
+                TempData["Error"] = "Only fulfilled prescriptions can be reopened.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            rx.Status = PrescriptionStatus.Pending;
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("PRESCRIPTION_REOPENED", $"Admin override: reopened prescription #{rx.Id} (was Fulfilled, now Pending).");
+            TempData["Success"] = "Prescription reopened (Admin override logged).";
             return RedirectToAction(nameof(Index));
+        }
+
+        // Replaces the old hard delete — prescriptions are clinical records and are
+        // never removed; a mistaken entry is cancelled with a documented reason.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Cancel(int id, string cancelReason)
+        {
+            var rx = await _context.Prescriptions.FindAsync(id);
+            if (rx == null) return NotFound();
+
+            if (rx.Status == PrescriptionStatus.Fulfilled)
+            {
+                TempData["Error"] = $"Prescription #{rx.Id} was already dispensed. It cannot be cancelled — void or refund the sale instead.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (rx.Status == PrescriptionStatus.Cancelled)
+            {
+                TempData["Error"] = "This prescription is already cancelled.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(cancelReason) || cancelReason.Length > 500)
+            {
+                TempData["Error"] = "A cancellation reason is required (max 500 characters).";
+                return RedirectToAction(nameof(Index));
+            }
+
+            rx.Status = PrescriptionStatus.Cancelled;
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("PRESCRIPTION_CANCELLED", $"Cancelled prescription #{rx.Id}: {cancelReason.Trim()}");
+            TempData["Success"] = "Prescription cancelled and logged.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        private async Task LogAuditAsync(string action, string details)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Timestamp = DateTime.Now,
+                UserId = user?.Id,
+                UserName = user?.FullName ?? user?.UserName ?? "Staff",
+                UserRole = User.IsInRole("Admin") ? "Admin" : "Pharmacist",
+                Action = action,
+                Module = "Prescriptions",
+                Details = details,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+            });
+            await _context.SaveChangesAsync();
         }
     }
 }

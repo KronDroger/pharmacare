@@ -55,7 +55,7 @@ namespace CarePlusPharmacy.Data
                 var medicines = new List<Medicine>
                 {
                     new() { Name = "Biogesic 500mg", GenericName = "Paracetamol", Category = "Analgesic / Antipyretic", Manufacturer = "Unilab", UnitPrice = 8.50m, ReorderLevel = 50, SupplierId = suppliers[0].Id, Description = "Fast relief for headache, minor aches, and fever." },
-                    new() { Name = "Amoxil 500mg", GenericName = "Amoxicillin Trihydrate", Category = "Antibiotics", Manufacturer = "GSK (GlaxoSmithKline)", UnitPrice = 16.00m, ReorderLevel = 40, SupplierId = suppliers[1].Id, Description = "Broad-spectrum prescription antibiotic for bacterial infections." },
+                    new() { Name = "Amoxil 500mg", GenericName = "Amoxicillin Trihydrate", Category = "Antibiotics", Manufacturer = "GSK (GlaxoSmithKline)", UnitPrice = 16.00m, ReorderLevel = 40, SupplierId = suppliers[1].Id, RxRequired = true, Description = "Broad-spectrum prescription antibiotic for bacterial infections." },
                     new() { Name = "Advil 200mg Softgel", GenericName = "Ibuprofen Liqui-Gels", Category = "NSAID / Pain Relief", Manufacturer = "Haleon / Pfizer", UnitPrice = 12.75m, ReorderLevel = 50, SupplierId = suppliers[0].Id, Description = "Targeted relief for acute muscular and inflammatory pain." },
                     new() { Name = "Zyrtec 10mg", GenericName = "Cetirizine Dihydrochloride", Category = "Antihistamine / Allergy", Manufacturer = "Johnson & Johnson", UnitPrice = 28.50m, ReorderLevel = 30, SupplierId = suppliers[2].Id, Description = "24-hour relief from allergy, rhinitis, and urticaria." },
                     new() { Name = "Cozaar 50mg", GenericName = "Losartan Potassium", Category = "Cardiovascular / Antihypertensive", Manufacturer = "Organon / MSD", UnitPrice = 22.00m, ReorderLevel = 30, SupplierId = suppliers[1].Id, IsVatExempt = true, Description = "Essential daily maintenance for blood pressure and kidney protection." },
@@ -207,6 +207,7 @@ namespace CarePlusPharmacy.Data
             // ---- 4. Ensure Rich 50+ Dataset for Billing, Medicines, Sales, and Customers ----
             await EnsureRichDataSeededAsync(context, userManager);
             await EnsureVatExemptMedicinesAsync(context);
+            await EnsureRxRequiredMedicinesAsync(context);
 
             // ---- 5. Link demo accounts to their Customer records ----
             // The portal resolves patients via ApplicationUser.CustomerId, so the demo
@@ -272,6 +273,21 @@ namespace CarePlusPharmacy.Data
                 .ToList();
             foreach (var med in exemptMeds) { med.IsVatExempt = true; }
             if (exemptMeds.Any()) { await context.SaveChangesAsync(); }
+        }
+
+        // Backfill Rx-Required flags on databases seeded before this feature existed:
+        // antibiotics / controlled maintenance meds that must be dispensed with a prescription.
+        private static async Task EnsureRxRequiredMedicinesAsync(ApplicationDbContext context)
+        {
+            if (await context.Medicines.AnyAsync(m => m.RxRequired)) return;
+
+            var rxMeds = context.Medicines
+                .Where(m => m.Name == "Amoxil 500mg" || m.Name == "Augmentin 625mg"
+                         || m.Name == "Arcoxia 90mg" || m.Name == "Celebrex 200mg"
+                         || m.Name == "Betaloc 50mg" || m.Name == "Catapres 75mcg")
+                .ToList();
+            foreach (var med in rxMeds) { med.RxRequired = true; }
+            if (rxMeds.Any()) { await context.SaveChangesAsync(); }
         }
 
         private static async Task CreateUserIfNotExists(

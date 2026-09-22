@@ -75,6 +75,14 @@
             <div class="text-muted" style="font-size: 11px;">Check for medicines exempt from 12% VAT (RA 10963-exempt items). Not charged VAT at the counter; VAT-Exempt flag also affects Senior/PWD discount base.</div>
         </div>
 
+        <div class="form-check mb-1 p-2 ps-4 rounded" style="background: var(--cp-warning-bg);">
+            <input asp-for="RxRequired" class="form-check-input" type="checkbox" id="RxRequired" />
+            <label class="form-check-label fw-semibold" for="RxRequired" style="font-size: 13px; color: var(--cp-warning);">
+                Requires Prescription (Rx)
+            </label>
+            <div class="text-muted" style="font-size: 11px;">Rx medicines can only be sold with an active, customer-linked prescription and pharmacist-verified dispensing.</div>
+        </div>
+
         <div class="d-flex gap-2">
             <button type="submit" class="btn btn-careplus px-4">Save to Catalog</button>
             <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>

@@ -21,6 +21,12 @@ namespace CarePlusPharmacy.Models
 
         public PrescriptionStatus Status { get; set; } = PrescriptionStatus.Pending;
 
+        // Set when the prescription is dispensed from the POS — links the
+        // fulfilled prescription to the Sale it was fulfilled through.
+        [Display(Name = "Fulfilling Sale")]
+        public int? SaleId { get; set; }
+        public Sale? Sale { get; set; }
+
         public ICollection<PrescriptionDetail> Details { get; set; } = new List<PrescriptionDetail>();
     }
 }

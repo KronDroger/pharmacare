@@ -191,7 +191,7 @@
         foreach (var d in rx.Details)
         {
             <text>
-            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"));
+            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"), @(d.Medicine?.RxRequired == true ? "true" : "false"));
             </text>
         }
     }
@@ -273,6 +273,9 @@
             const vatBadge = med.isVatExempt
                 ? '<span class="badge ms-1" style="background: var(--cp-mint-subtle); color: var(--cp-forest);" title="VAT-Exempt medicine">No VAT</span>'
                 : '';
+            const rxBadge = med.rxRequired
+                ? '<span class="badge ms-1" style="background: var(--cp-warning-bg); color: var(--cp-warning);" title="Requires prescription (Rx)">Rx</span>'
+                : '';
 
             let genericLine = med.genericName || 'Standard Formula';
             let mfrLine = med.manufacturer ? '<div class="text-muted" style="font-size: 11px;"><i class="bi bi-building me-1"></i>' + med.manufacturer + '</div>' : '';
@@ -288,7 +291,7 @@
                 '<div>' +
                 '<div class="d-flex justify-content-between align-items-start mb-1">' +
                 '<span class="badge bg-light text-muted border text-truncate" style="font-size: 10.5px; max-width: 140px;">' + med.category + '</span>' +
-                '<span class="d-inline-flex align-items-center gap-1">' + stockBadge + vatBadge + expiredNote + '</span>' +
+                '<span class="d-inline-flex align-items-center gap-1">' + stockBadge + vatBadge + rxBadge + expiredNote + '</span>' +
                 '</div>' +
                 '<div class="fw-bold fs-6 text-dark text-truncate" title="' + med.name + '">' + med.name + '</div>' +
                 '<div class="text-muted text-truncate" style="font-size: 12px;" title="' + genericLine + '"><i class="bi bi-capsule me-1"></i>' + genericLine + '</div>' +
@@ -298,7 +301,7 @@
                 '<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">' +
                 '<span class="fw-bold fs-5 text-success">₱' + price + '</span>' +
                 '<button type="button" class="btn btn-sm ' + (isOutOfStock ? 'btn-secondary' : 'btn-careplus') + ' px-3" ' + (isOutOfStock ? 'disabled' : '') +
-                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ')">' +
+                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ', ' + (med.rxRequired ? 'true' : 'false') + ')">' +
                 '<i class="bi bi-plus-lg me-1"></i> Add</button>' +
                 '</div>' +
                 '</div>' +
@@ -330,7 +333,7 @@
             '</div>';
     }
 
-    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false) {
+    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false, rxRequired = false) {
         const existing = cart.find(i => i.medId === medId);
         if (existing) {
             if (existing.qty + initialQty <= maxStock) {
@@ -340,7 +343,7 @@
             }
         } else {
             if (initialQty <= maxStock) {
-                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt });
+                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt, rxRequired: !!rxRequired });
             } else {
                 alert(`Cannot add. Only ${maxStock} units in stock.`);
             }
@@ -518,6 +521,11 @@
 
     async function submitCheckout() {
         if (cart.length === 0) return;
+
+        if (cart.some(i => i.rxRequired) && !(prescriptionId > 0)) {
+            alert('This cart contains a prescription (Rx) medicine. Link the customer\'s prescription via the Prescriptions module, then use its "Dispense (POS)" button.');
+            return;
+        }
 
         const customerId = parseInt(document.getElementById('customerSelect').value, 10) || null;
         const payMethod = document.querySelector('input[name="payMethod"]:checked').value;

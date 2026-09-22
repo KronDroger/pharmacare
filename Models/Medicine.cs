@@ -37,6 +37,11 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "VAT-Exempt Medicine")]
         public bool IsVatExempt { get; set; } = false;
 
+        // Rx-Required medicines cannot be sold from the POS without an active,
+        // customer-linked prescription and pharmacist-verified dispensing.
+        [Display(Name = "Requires Prescription (Rx)")]
+        public bool RxRequired { get; set; } = false;
+
         [Required]
         [Display(Name = "Supplier")]
         public int SupplierId { get; set; }
