@@ -74,3 +74,54 @@
 - [x] Printed receipts/invoices stay paper-white; auth pages unaffected (no `.app-shell`)
 - [x] `data-bs-theme="dark"` set on `#appShell` at runtime for Bootstrap 5.3 theming
 - [x] Charts adapt: global `window.appChartTheme(dark)` in `_Layout.cshtml`; `Home/Index.cshtml` & `Reports/Index.cshtml` register their Chart.js instances and re-render colors on load/toggle
+
+---
+
+# Reinforcement Phases (Phases 11-16)
+
+## Phase 11: Link Customer Logins Safely (commit `8b87fef`)
+- [x] Pre-migration cleanup: duplicate `Customers.Email` deduped via SQL (kept the oldest `Id` per email, blanked 26 duplicates so a unique index could be created)
+- [x] `AspNetUsers.CustomerId` int? + FK to `Customers` (restrict) + unique `IX_AspNetUsers_CustomerId`; unique `IX_Customers_Email`
+- [x] Migration `20260922201110_LinkUsersToCustomers` applied
+- [x] `AccountController.Register`: new email -> creates account + Customer profile linked atomically (single transaction); existing patient email -> links only when the phone matches their record, otherwise blocked with a "contact the pharmacy" message; duplicate/blanked emails still handleable
+- [x] Verified e2e: fresh register links; matching-phone link works; non-matching phone blocked
+
+## Phase 12: Customer Portal (commit `f98690e`)
+- [x] `PortalController` + views: Index (dashboard), Profile, Purchases (filtered/paginated own sales), PurchaseDetails, Prescriptions, Rewards, Subscriptions
+- [x] `CustomerSubscription.PickupBranchId` + migration `20260922202438_AddPortalPickupBranch` (pickup branch selection on subscription)
+- [x] "My Account" sidebar entry on the portal; Portal home card; own-data scoping enforced per customer via `CurrentCustomerService`
+- [x] Subscribe / Pause / Resume / Set Pickup Branch / Cancel flows (Portal) with `PORTAL_SUBSCRIBE` etc. audit logs
+- [x] Verified cashier cannot access portal data and portal pages reject unlinked users
+
+## Phase 13: PWD/Senior Discount + VAT (commit `7218379`)
+- [x] `SaleDiscountType { None, Senior, Pwd }` enum; `Medicine.IsVatExempt`; `Sale` + `VatableSales`, `VatExemptSales`, `VatAmount` (decimal(12,2)), `DiscountType`, `DiscountIdNumber`
+- [x] `Services/PricingService.cs`: pure engine (12% VAT, 20% Senior/PWD statutory discount); registered singleton; `JsonStringEnumConverter` so the client posts enum strings
+- [x] POS `Views/Sales/Create.cshtml`: statutory discount dropdown + required government ID input for Senior/PWD, client-side preview mirroring the server math, "No VAT" badge
+- [x] `SalesController.Checkout` is server-authoritative: reprices via `PricingService`, validates the ID number when a discount is chosen, caps points at the payable-after-statutory-discount, persists VAT/discount fields, audit log includes VAT + discount
+- [x] Receipt (`Sales/Details`) and invoice (`Billing/Details`) print the stored VAT/statutory/points breakdown
+- [x] Medicines Create/Edit: `IsVatExempt` checkbox; DbInitializer seeds VAT-exempt Cozaar + Glucophage and runs an idempotent backfill for existing DBs (outside the `Suppliers.Any()` sample-data guard)
+- [x] Migration `20260922205303_AddVatAndDiscountFields` applied; e2e math verified (vatable + exempt totals, VAT 2.46, Senior 8.01, points 34, net 0.49; missing-ID rejection)
+
+## Phase 14: Rx-Required Medicines + Pharmacist-Only Dispensing (commit `85ce0e0`)
+- [x] `Medicine.RxRequired`; `Prescription.SaleId` + `Sale? Sale` navigation
+- [x] DbInitializer marks Amoxil Rx-required (seed + idempotent backfill for the existing catalog)
+- [x] `SalesController.Checkout` Rx gate: Rx-required cart items (or a linked rx) require a Pharmacist/Admin operator, a linked customer, and a **Pending prescription owned by that customer** whose lines cover each Rx item with qty <= prescribed; fulfillment sets `Status = Fulfilled` + `SaleId` inside the same transaction
+- [x] POS grid shows an `Rx` badge, enforces `addToCart` rxRequired, and blocks checkout of Rx items without a linked prescription id
+- [x] `PrescriptionsController` rewritten: Fulfill, Reopen (Admin-only + audit), Cancel-with-required-reason (≤500 chars, replaces delete; Fulfilled rxs cannot be cancelled -> "void or refund the sale instead")
+- [x] `Views/Prescriptions/Index.cshtml`: Dispense (POS) / Fulfill / Cancel-with-reason for Pending rows; receipt link + Admin-only Reopen for Fulfilled rows; Rx badge on medicine names
+- [x] Migration `20260922210422_AddRxRequiredAndSaleLink` applied; e2e verified: cashier blocked, pharmacist without rx blocked, dispense OK, re-dispense blocked, admin reopen OK, pharmacist reopen denied, cancel with/without reason
+
+## Phase 15: Void / Refund Completed Sales (commit `2340ad6`)
+- [x] `Sale.IsVoided`, `VoidReason` (max 500), `VoidedById`, `VoidedAt`
+- [x] `SalesController.Void` (POST, Admin/Pharmacist only): returns stock to the exact sold batches, reverses loyalty points (undo earned, refund redeemed), marks the invoice `Refunded`, flags the sale, audit-logs `SALE_VOIDED` with reason; double-void blocked
+- [x] A sale that fulfilled a prescription may only be voided by an **Admin** (it reopens the Rx to Pending with an audit entry) — preserves the Phase 14 guard
+- [x] Voided sales excluded from Home dashboard, Reports KPIs/trends/top-medicines/top-customers, customer portal purchases/spent, and Billing ledger totals
+- [x] `Sales/Index` gains an Active/Voided filter, VOIDED badge + strikethrough totals, and a Void action (with reason prompt); receipts show a `VOIDED / REFUNDED` banner (+ voided-by/at/reason); invoices show a `Refunded` badge
+- [x] Migration `20260922211753_AddVoidFields` applied; e2e verified: cashier denied, pharmacist void restores stock/reverts points (196->156->196), double-void rejected, rx-sale pharmacist denied + admin void reopens rx
+
+## Phase 16: Login Security (commit `767a7cd`)
+- [x] Identity lockout: `MaxFailedAccessAttempts = 5`, `DefaultLockoutTimeSpan = 15` minutes, `lockoutOnFailure: true` on `PasswordSignInAsync`; locked-account messaging on the login page
+- [x] Min password length raised to 8 (`Password.RequiredLength`) — all existing demo passwords already comply
+- [x] Demo account seeds (`CreateUserIfNotExists` x5) gated to `IHostEnvironment.IsDevelopment()`; "Quick Demo Logins" autofill chips only render in Development
+- [x] Removed the fake tile-CAPTCHA ("Select all images") markup/JS and the `/Account/ConfirmCaptcha` endpoint + `RecaptchaService`/`IRecaptchaService` (server verification no longer expected)
+- [x] Verified e2e: login page clean of captcha, ConfirmCaptcha 404s, normal login works, 5 failed attempts lock the account (correct password then rejected with the lock message), other accounts unaffected
