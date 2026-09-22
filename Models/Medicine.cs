@@ -32,6 +32,11 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "Reorder Level")]
         public int ReorderLevel { get; set; } = 50;
 
+        // VAT-Exempt medicines (medicinal products covered by RA 10963 VAT exemptions /
+        // certain prescription maintenance medicines) are not charged 12% VAT at the counter.
+        [Display(Name = "VAT-Exempt Medicine")]
+        public bool IsVatExempt { get; set; } = false;
+
         [Required]
         [Display(Name = "Supplier")]
         public int SupplierId { get; set; }

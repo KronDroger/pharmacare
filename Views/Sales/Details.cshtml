@@ -1,9 +1,9 @@
 @model Sale
 @{
     ViewData["Title"] = $"Receipt - Sale #{Model.Id}";
-    var vatRate = 0.12m;
-    var vatableSales = Model.TotalAmount / (1 + vatRate);
-    var vatAmount = Model.TotalAmount - vatableSales;
+    var statDiscount = Model.PointsRedeemed > 0 && Model.DiscountType != CarePlusPharmacy.Models.SaleDiscountType.None
+        ? Math.Max(0, Model.DiscountAmount - Model.PointsRedeemed)
+        : Model.DiscountAmount;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
@@ -99,11 +99,18 @@
             <span>Gross Total:</span>
             <span>₱@Model.GrossAmount.ToString("N2")</span>
         </div>
-        @if (Model.DiscountAmount > 0)
+        @if (Model.DiscountType != CarePlusPharmacy.Models.SaleDiscountType.None)
+        {
+            <div class="d-flex justify-content-between mb-1 text-primary">
+                <span>@(Model.DiscountType == CarePlusPharmacy.Models.SaleDiscountType.Senior ? "Senior Citizen" : "PWD") Discount (20%)@(string.IsNullOrEmpty(Model.DiscountIdNumber) ? "" : $" · ID {Model.DiscountIdNumber}"):</span>
+                <span>-₱@statDiscount.ToString("N2")</span>
+            </div>
+        }
+        @if (Model.PointsRedeemed > 0)
         {
             <div class="d-flex justify-content-between mb-1 text-success">
                 <span>CRM Points Discount:</span>
-                <span>-₱@Model.DiscountAmount.ToString("N2")</span>
+                <span>-₱@Model.PointsRedeemed.ToString("N2")</span>
             </div>
         }
         <div class="d-flex justify-content-between fs-6 fw-bold border-top pt-1 text-dark">
@@ -131,16 +138,19 @@
         <div class="border-top pt-2 mt-2 text-muted" style="font-size: 10.5px;">
             <div class="d-flex justify-content-between">
                 <span>12% VATable Sales:</span>
-                <span>₱@vatableSales.ToString("N2")</span>
+                <span>₱@Model.VatableSales.ToString("N2")</span>
             </div>
             <div class="d-flex justify-content-between">
                 <span>12% VAT Amount:</span>
-                <span>₱@vatAmount.ToString("N2")</span>
+                <span>₱@Model.VatAmount.ToString("N2")</span>
             </div>
-            <div class="d-flex justify-content-between">
-                <span>VAT-Exempt:</span>
-                <span>₱0.00</span>
-            </div>
+            @if (Model.VatExemptSales > 0)
+            {
+                <div class="d-flex justify-content-between">
+                    <span>VAT-Exempt Sales:</span>
+                    <span>₱@Model.VatExemptSales.ToString("N2")</span>
+                </div>
+            }
         </div>
 
         @if (Model.Customer != null)

@@ -105,6 +105,10 @@
                 <span class="text-muted">Subtotal:</span>
                 <span class="fw-semibold text-dark">₱<span id="subtotalDisplay">0.00</span></span>
             </div>
+            <div class="d-flex justify-content-between mb-1 text-primary d-none" id="statDiscountRow" style="font-size: 13px;">
+                <span id="statDiscountLabel">Senior/PWD Discount (20%):</span>
+                <span>-₱<span id="statDiscountDisplay">0.00</span></span>
+            </div>
             <div class="d-flex justify-content-between mb-1 text-success d-none" id="discountRow" style="font-size: 13px;">
                 <span>Points Discount:</span>
                 <span>-₱<span id="discountDisplay">0.00</span></span>
@@ -112,6 +116,23 @@
             <div class="d-flex justify-content-between align-items-center mb-3 pt-2 border-top">
                 <span class="fw-bold fs-6">Net Payable:</span>
                 <span class="fw-bold fs-4 text-success">₱<span id="netTotalDisplay">0.00</span></span>
+            </div>
+
+            <!-- Statutory Discount (Senior Citizen / PWD) -->
+            <div class="mb-2 p-2 rounded" style="background: var(--cp-mint-subtle); border: 1px solid rgba(16, 185, 129, 0.25);">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">STATUTORY DISCOUNT (20%)</label>
+                <select id="discountTypeSelect" class="form-select form-select-sm mb-2" onchange="onDiscountChange()">
+                    <option value="None" selected>None — Standard Price</option>
+                    <option value="Senior">Senior Citizen</option>
+                    <option value="Pwd">Person with Disability (PWD)</option>
+                </select>
+                <div id="discountIdArea" class="d-none">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text" style="background: var(--cp-surface-elevated);"><i class="bi bi-person-vcard text-muted"></i></span>
+                        <input type="text" id="discountIdInput" class="form-control" maxlength="30" placeholder="ID Number (required)" />
+                    </div>
+                    <div class="text-muted mt-1" style="font-size: 10.5px;"><i class="bi bi-info-circle me-1"></i>e.g. OSCA/PWD ID number — verified before checkout</div>
+                </div>
             </div>
 
             <!-- Payment Method Select -->
@@ -170,7 +191,7 @@
         foreach (var d in rx.Details)
         {
             <text>
-            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity);
+            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"));
             </text>
         }
     }
@@ -249,6 +270,9 @@
             const expiredNote = expiredUnits > 0
                 ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" title="' + expiredUnits + ' expired units are not sellable">' + expiredUnits + ' exp.</span>'
                 : '';
+            const vatBadge = med.isVatExempt
+                ? '<span class="badge ms-1" style="background: var(--cp-mint-subtle); color: var(--cp-forest);" title="VAT-Exempt medicine">No VAT</span>'
+                : '';
 
             let genericLine = med.genericName || 'Standard Formula';
             let mfrLine = med.manufacturer ? '<div class="text-muted" style="font-size: 11px;"><i class="bi bi-building me-1"></i>' + med.manufacturer + '</div>' : '';
@@ -264,7 +288,7 @@
                 '<div>' +
                 '<div class="d-flex justify-content-between align-items-start mb-1">' +
                 '<span class="badge bg-light text-muted border text-truncate" style="font-size: 10.5px; max-width: 140px;">' + med.category + '</span>' +
-                '<span class="d-inline-flex align-items-center gap-1">' + stockBadge + expiredNote + '</span>' +
+                '<span class="d-inline-flex align-items-center gap-1">' + stockBadge + vatBadge + expiredNote + '</span>' +
                 '</div>' +
                 '<div class="fw-bold fs-6 text-dark text-truncate" title="' + med.name + '">' + med.name + '</div>' +
                 '<div class="text-muted text-truncate" style="font-size: 12px;" title="' + genericLine + '"><i class="bi bi-capsule me-1"></i>' + genericLine + '</div>' +
@@ -274,7 +298,7 @@
                 '<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">' +
                 '<span class="fw-bold fs-5 text-success">₱' + price + '</span>' +
                 '<button type="button" class="btn btn-sm ' + (isOutOfStock ? 'btn-secondary' : 'btn-careplus') + ' px-3" ' + (isOutOfStock ? 'disabled' : '') +
-                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ')">' +
+                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ')">' +
                 '<i class="bi bi-plus-lg me-1"></i> Add</button>' +
                 '</div>' +
                 '</div>' +
@@ -306,7 +330,7 @@
             '</div>';
     }
 
-    function addToCart(medId, medName, price, maxStock, initialQty = 1) {
+    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false) {
         const existing = cart.find(i => i.medId === medId);
         if (existing) {
             if (existing.qty + initialQty <= maxStock) {
@@ -316,7 +340,7 @@
             }
         } else {
             if (initialQty <= maxStock) {
-                cart.push({ medId, medName, price, maxStock, qty: initialQty });
+                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt });
             } else {
                 alert(`Cannot add. Only ${maxStock} units in stock.`);
             }
@@ -407,6 +431,18 @@
         updateSummary();
     }
 
+    function onDiscountChange() {
+        const type = document.getElementById('discountTypeSelect').value;
+        const area = document.getElementById('discountIdArea');
+        if (type !== 'None') {
+            area.classList.remove('d-none');
+        } else {
+            area.classList.add('d-none');
+            document.getElementById('discountIdInput').value = '';
+        }
+        updateSummary();
+    }
+
     function updateSummary() {
         const subtotal = cart.reduce((sum, i) => sum + (i.qty * i.price), 0);
         document.getElementById('subtotalDisplay').innerText = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -415,16 +451,34 @@
         const usePoints = document.getElementById('usePointsSwitch').checked;
         const availablePoints = parseInt(select.options[select.selectedIndex]?.dataset.points || '0', 10);
 
+        // VAT pools + statutory Senior/PWD discount (mirrors the server-side PricingService)
+        const vatable = cart.reduce((sum, i) => sum + (i.isVatExempt ? 0 : (i.qty * i.price)), 0);
+        const exempt = cart.reduce((sum, i) => sum + (i.isVatExempt ? (i.qty * i.price) : 0), 0);
+        const discountType = document.getElementById('discountTypeSelect').value;
+
+        let statDiscount = 0;
+        if (discountType === 'Senior' || discountType === 'Pwd') {
+            statDiscount = Math.round(0.20 * ((vatable / 1.12) + exempt) * 100) / 100;
+            document.getElementById('statDiscountLabel').innerText = (discountType === 'Senior' ? 'Senior' : 'PWD') + ' Discount (20%):';
+        }
+        if (statDiscount > 0) {
+            document.getElementById('statDiscountRow').classList.remove('d-none');
+            document.getElementById('statDiscountDisplay').innerText = statDiscount.toFixed(2);
+        } else {
+            document.getElementById('statDiscountRow').classList.add('d-none');
+        }
+
         let discount = 0;
+        const payableBeforePoints = Math.max(0, subtotal - statDiscount);
         if (usePoints && availablePoints > 0) {
-            discount = Math.min(availablePoints, Math.floor(subtotal));
+            discount = Math.min(availablePoints, Math.floor(payableBeforePoints));
             document.getElementById('discountRow').classList.remove('d-none');
             document.getElementById('discountDisplay').innerText = discount.toFixed(2);
         } else {
             document.getElementById('discountRow').classList.add('d-none');
         }
 
-        const netTotal = Math.max(0, subtotal - discount);
+        const netTotal = Math.max(0, subtotal - statDiscount - discount);
         document.getElementById('netTotalDisplay').innerText = netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         updateChange();
@@ -478,9 +532,19 @@
             return;
         }
 
-        const usePoints = document.getElementById('usePointsSwitch').checked;
+const usePoints = document.getElementById('usePointsSwitch').checked;
         const availablePoints = parseInt(document.getElementById('customerSelect').options[document.getElementById('customerSelect').selectedIndex]?.dataset.points || '0', 10);
-        const pointsToRedeem = usePoints ? Math.min(availablePoints, Math.floor(netTotal)) : 0;
+        const discountType = document.getElementById('discountTypeSelect').value;
+        const discountIdNumber = document.getElementById('discountIdInput').value.trim();
+
+        if (discountType !== 'None' && discountIdNumber.length === 0) {
+            alert('Please enter the Senior Citizen / PWD ID number to apply the discount.');
+            return;
+        }
+
+        const statDiscount = parseFloat(document.getElementById('statDiscountDisplay').innerText) || 0;
+        const payableBeforePoints = Math.max(0, (cart.reduce((s, i) => s + (i.qty * i.price), 0)) - statDiscount);
+        const pointsToRedeem = usePoints ? Math.min(availablePoints, Math.floor(payableBeforePoints)) : 0;
 
         const payload = {
             customerId: customerId,
@@ -488,6 +552,8 @@
             paymentMethod: payMethod,
             cashTendered: cashTendered,
             pointsToRedeem: pointsToRedeem,
+            discountType: discountType,
+            discountIdNumber: discountIdNumber,
             items: cart.map(i => ({ medicineId: i.medId, quantity: i.qty }))
         };
 

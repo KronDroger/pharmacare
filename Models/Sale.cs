@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CarePlusPharmacy.Models
 {
@@ -22,6 +23,27 @@ namespace CarePlusPharmacy.Models
         [DataType(DataType.Date)]
         [Display(Name = "Sale Date")]
         public DateTime SaleDate { get; set; } = DateTime.Today;
+
+        [Column(TypeName = "decimal(12,2)")]
+        [Display(Name = "Vatable Sales")]
+        public decimal VatableSales { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12,2)")]
+        [Display(Name = "VAT-Exempt Sales")]
+        public decimal VatExemptSales { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12,2)")]
+        [Display(Name = "VAT Amount (12%)")]
+        public decimal VatAmount { get; set; } = 0;
+
+        // Statutory discount type applied (None / Senior / Pwd). The monetary discount
+        // itself is part of DiscountAmount below, alongside any points redemption.
+        [Display(Name = "Discount Type")]
+        public SaleDiscountType DiscountType { get; set; } = SaleDiscountType.None;
+
+        [StringLength(30)]
+        [Display(Name = "Discount ID Number")]
+        public string? DiscountIdNumber { get; set; }
 
         [Display(Name = "Discount (₱)")]
         public decimal DiscountAmount { get; set; } = 0;

@@ -1,9 +1,13 @@
 @model Billing
 @{
     ViewData["Title"] = $"Invoice {Model.InvoiceNumber}";
-    var vatRate = 0.12m;
-    var vatableSales = Model.AmountDue / (1 + vatRate);
-    var vatAmount = Model.AmountDue - vatableSales;
+    var statDiscount = 0m;
+    if (Model.Sale != null)
+    {
+        statDiscount = Model.Sale.PointsRedeemed > 0 && Model.Sale.DiscountType != CarePlusPharmacy.Models.SaleDiscountType.None
+            ? Math.Max(0, Model.Sale.DiscountAmount - Model.Sale.PointsRedeemed)
+            : Model.Sale.DiscountAmount;
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
@@ -105,22 +109,33 @@
         <div class="col-sm-6">
             <div class="p-3 rounded bg-light border">
                 <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
+                    <span class="text-muted">Gross Sales:</span>
+                    <span>₱@(Model.Sale?.GrossAmount.ToString("N2") ?? Model.AmountDue.ToString("N2"))</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
                     <span class="text-muted">12% VATable Sales:</span>
-                    <span>₱@vatableSales.ToString("N2")</span>
+                    <span>₱@(Model.Sale?.VatableSales.ToString("N2") ?? "0.00")</span>
                 </div>
                 <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
                     <span class="text-muted">Value Added Tax (12% VAT):</span>
-                    <span>₱@vatAmount.ToString("N2")</span>
+                    <span>₱@(Model.Sale?.VatAmount.ToString("N2") ?? "0.00")</span>
                 </div>
                 <div class="d-flex justify-content-between mb-2" style="font-size: 13px;">
                     <span class="text-muted">VAT-Exempt Sales:</span>
-                    <span>₱0.00</span>
+                    <span>₱@(Model.Sale?.VatExemptSales.ToString("N2") ?? "0.00")</span>
                 </div>
-                @if (Model.Sale?.DiscountAmount > 0)
+                @if (Model.Sale != null && Model.Sale.DiscountType != CarePlusPharmacy.Models.SaleDiscountType.None)
+                {
+                    <div class="d-flex justify-content-between mb-2 text-primary" style="font-size: 13px;">
+                        <span>@(Model.Sale.DiscountType == CarePlusPharmacy.Models.SaleDiscountType.Senior ? "Senior Citizen" : "PWD") Discount (20%)@(string.IsNullOrEmpty(Model.Sale.DiscountIdNumber) ? "" : $" · ID {Model.Sale.DiscountIdNumber}"):</span>
+                        <span>-₱@statDiscount.ToString("N2")</span>
+                    </div>
+                }
+                @if (Model.Sale != null && Model.Sale.PointsRedeemed > 0)
                 {
                     <div class="d-flex justify-content-between mb-2 text-success" style="font-size: 13px;">
                         <span>CRM Points Discount:</span>
-                        <span>-₱@Model.Sale.DiscountAmount.ToString("N2")</span>
+                        <span>-₱@Model.Sale.PointsRedeemed.ToString("N2")</span>
                     </div>
                 }
                 <div class="d-flex justify-content-between fs-5 fw-bold border-top pt-2 text-dark">

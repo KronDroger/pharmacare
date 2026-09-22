@@ -58,8 +58,8 @@ namespace CarePlusPharmacy.Data
                     new() { Name = "Amoxil 500mg", GenericName = "Amoxicillin Trihydrate", Category = "Antibiotics", Manufacturer = "GSK (GlaxoSmithKline)", UnitPrice = 16.00m, ReorderLevel = 40, SupplierId = suppliers[1].Id, Description = "Broad-spectrum prescription antibiotic for bacterial infections." },
                     new() { Name = "Advil 200mg Softgel", GenericName = "Ibuprofen Liqui-Gels", Category = "NSAID / Pain Relief", Manufacturer = "Haleon / Pfizer", UnitPrice = 12.75m, ReorderLevel = 50, SupplierId = suppliers[0].Id, Description = "Targeted relief for acute muscular and inflammatory pain." },
                     new() { Name = "Zyrtec 10mg", GenericName = "Cetirizine Dihydrochloride", Category = "Antihistamine / Allergy", Manufacturer = "Johnson & Johnson", UnitPrice = 28.50m, ReorderLevel = 30, SupplierId = suppliers[2].Id, Description = "24-hour relief from allergy, rhinitis, and urticaria." },
-                    new() { Name = "Cozaar 50mg", GenericName = "Losartan Potassium", Category = "Cardiovascular / Antihypertensive", Manufacturer = "Organon / MSD", UnitPrice = 22.00m, ReorderLevel = 30, SupplierId = suppliers[1].Id, Description = "Essential daily maintenance for blood pressure and kidney protection." },
-                    new() { Name = "Glucophage 500mg", GenericName = "Metformin Hydrochloride", Category = "Diabetes Care", Manufacturer = "Merck", UnitPrice = 14.50m, ReorderLevel = 40, SupplierId = suppliers[2].Id, Description = "First-line oral antidiabetic medication for Type 2 diabetes." },
+                    new() { Name = "Cozaar 50mg", GenericName = "Losartan Potassium", Category = "Cardiovascular / Antihypertensive", Manufacturer = "Organon / MSD", UnitPrice = 22.00m, ReorderLevel = 30, SupplierId = suppliers[1].Id, IsVatExempt = true, Description = "Essential daily maintenance for blood pressure and kidney protection." },
+                    new() { Name = "Glucophage 500mg", GenericName = "Metformin Hydrochloride", Category = "Diabetes Care", Manufacturer = "Merck", UnitPrice = 14.50m, ReorderLevel = 40, SupplierId = suppliers[2].Id, IsVatExempt = true, Description = "First-line oral antidiabetic medication for Type 2 diabetes." },
                     new() { Name = "Solmux Advance 500mg", GenericName = "Carbocisteine + Zinc", Category = "Respiratory / Cough", Manufacturer = "Unilab", UnitPrice = 15.00m, ReorderLevel = 35, SupplierId = suppliers[0].Id, Description = "Dual action mucolytic for productive cough with phlegm." },
                     new() { Name = "Kremil-S Advance", GenericName = "Famotidine + Calcium Carb + Mag Hydroxide", Category = "Antacid / Gastrointestinal", Manufacturer = "Unilab", UnitPrice = 19.50m, ReorderLevel = 25, SupplierId = suppliers[0].Id, Description = "Fast relief from heartburn, hyperacidity, and acid reflux." }
                 };
@@ -206,6 +206,7 @@ namespace CarePlusPharmacy.Data
 
             // ---- 4. Ensure Rich 50+ Dataset for Billing, Medicines, Sales, and Customers ----
             await EnsureRichDataSeededAsync(context, userManager);
+            await EnsureVatExemptMedicinesAsync(context);
 
             // ---- 5. Link demo accounts to their Customer records ----
             // The portal resolves patients via ApplicationUser.CustomerId, so the demo
@@ -256,6 +257,21 @@ namespace CarePlusPharmacy.Data
             {
                 await context.SaveChangesAsync();
             }
+        }
+
+        // Backfill VAT-Exempt flags on databases seeded before this feature existed:
+        // diabetes & hypertension maintenance medicines (RA 10963-exempt).
+        private static async Task EnsureVatExemptMedicinesAsync(ApplicationDbContext context)
+        {
+            if (await context.Medicines.AnyAsync(m => m.IsVatExempt)) return;
+
+            var exemptMeds = context.Medicines
+                .Where(m => m.Name == "Glucophage 500mg" || m.Name == "Cozaar 50mg"
+                         || m.Name == "Betaloc 50mg" || m.Name == "Catapres 75mcg"
+                         || m.Name.StartsWith("Insulin"))
+                .ToList();
+            foreach (var med in exemptMeds) { med.IsVatExempt = true; }
+            if (exemptMeds.Any()) { await context.SaveChangesAsync(); }
         }
 
         private static async Task CreateUserIfNotExists(

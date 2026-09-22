@@ -1,6 +1,7 @@
 using System.Data;
 using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
+using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +15,13 @@ namespace CarePlusPharmacy.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly PricingService _pricingService;
 
-        public SalesController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public SalesController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, PricingService pricingService)
         {
             _context = context;
             _userManager = userManager;
+            _pricingService = pricingService;
         }
 
         // List all sales transactions
@@ -144,7 +147,8 @@ namespace CarePlusPharmacy.Controllers
                 totalStock = m.TotalStock,
                 sellableStock = m.SellableStock,
                 expiredStock = m.ExpiredStock,
-                nearestExpiry = m.NearestExpiry?.ToString("yyyy-MM-dd")
+                nearestExpiry = m.NearestExpiry?.ToString("yyyy-MM-dd"),
+                isVatExempt = m.IsVatExempt
             }).ToList();
 
             return Json(new
@@ -171,6 +175,8 @@ namespace CarePlusPharmacy.Controllers
             public string PaymentMethod { get; set; } = "Cash";
             public decimal CashTendered { get; set; }
             public int PointsToRedeem { get; set; }
+            public SaleDiscountType DiscountType { get; set; } = SaleDiscountType.None;
+            public string? DiscountIdNumber { get; set; }
             public List<PosItemDto> Items { get; set; } = new();
         }
 
@@ -258,6 +264,29 @@ namespace CarePlusPharmacy.Controllers
                     }
                 }
 
+                // Statutory Senior/PWD discount requires a valid government ID number.
+                if (model.DiscountType == SaleDiscountType.Senior || model.DiscountType == SaleDiscountType.Pwd)
+                {
+                    if (string.IsNullOrWhiteSpace(model.DiscountIdNumber) || model.DiscountIdNumber.Length > 30)
+                    {
+                        await tx.RollbackAsync();
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "Please provide the Senior Citizen / PWD ID number to apply the 20% discount."
+                        });
+                    }
+                }
+
+                // Price the sale (server-side VAT + statutory discount) — the client
+                // never dictates totals.
+                var priceLines = saleDetails.Select(d =>
+                {
+                    var med = medicines.FirstOrDefault(m => m.Id == d.MedicineId);
+                    return new PriceLine(d.Quantity * d.UnitPrice, med?.IsVatExempt ?? false);
+                });
+                var price = _pricingService.Compute(priceLines, model.DiscountType);
+
                 // Customer & Loyalty Points processing
                 Customer? customer = null;
 
@@ -266,24 +295,26 @@ namespace CarePlusPharmacy.Controllers
                     customer = await _context.Customers.FindAsync(model.CustomerId.Value);
                     if (customer != null)
                     {
-                        // 1 point = ₱1.00 discount (capped at grossTotal and customer's available points)
+                        // 1 point = ₱1.00 discount (capped at the remaining balance
+                        // after the statutory discount, and at available points)
+                        decimal payableBeforePoints = Math.Max(0, grossTotal - price.DiscountAmount);
                         if (model.PointsToRedeem > 0)
                         {
-                            int maxRedeemable = Math.Min(customer.LoyaltyPoints, (int)grossTotal);
+                            int maxRedeemable = Math.Min(customer.LoyaltyPoints, (int)payableBeforePoints);
                             int actualRedeem = Math.Min(model.PointsToRedeem, maxRedeemable);
                             discountAmount = actualRedeem;
                             customer.LoyaltyPoints -= actualRedeem;
                             pointsRedeemed = actualRedeem;
                         }
 
-                        // Earn 1 point per ₱100 spent on net amount
-                        decimal netPayable = Math.Max(0, grossTotal - discountAmount);
+                        // Earn 1 point per ₱100 spent on the final net amount
+                        decimal netPayable = Math.Max(0, grossTotal - price.DiscountAmount - discountAmount);
                         pointsEarned = (int)(netPayable / 100);
                         customer.LoyaltyPoints += pointsEarned;
                     }
                 }
 
-                finalAmount = Math.Max(0, grossTotal - discountAmount);
+                finalAmount = Math.Max(0, grossTotal - price.DiscountAmount - discountAmount);
                 cashTendered = model.CashTendered >= finalAmount ? model.CashTendered : finalAmount;
                 changeAmount = Math.Max(0, cashTendered - finalAmount);
 
@@ -293,7 +324,12 @@ namespace CarePlusPharmacy.Controllers
                     CashierId = _userManager.GetUserId(User),
                     PaymentMethod = string.IsNullOrWhiteSpace(model.PaymentMethod) ? "Cash" : model.PaymentMethod,
                     SaleDate = DateTime.Now,
-                    DiscountAmount = discountAmount,
+                    VatableSales = price.VatableSales,
+                    VatExemptSales = price.VatExemptSales,
+                    VatAmount = price.VatAmount,
+                    DiscountType = model.DiscountType,
+                    DiscountIdNumber = string.IsNullOrWhiteSpace(model.DiscountIdNumber) ? null : model.DiscountIdNumber.Trim(),
+                    DiscountAmount = price.DiscountAmount + discountAmount,
                     PointsEarned = pointsEarned,
                     PointsRedeemed = pointsRedeemed,
                     Details = saleDetails
@@ -336,7 +372,7 @@ namespace CarePlusPharmacy.Controllers
                     UserRole = User.IsInRole("Admin") ? "Admin" : (User.IsInRole("Pharmacist") ? "Pharmacist" : "Cashier"),
                     Action = "POS_SALE_COMPLETED",
                     Module = "Sales & POS",
-                    Details = $"Processed Sale #{sale.Id} ({sale.PaymentMethod}): ₱{finalAmount:N2}, Issued {billing.InvoiceNumber}",
+                    Details = $"Processed Sale #{sale.Id} ({sale.PaymentMethod}): ₱{finalAmount:N2} gross ₱{grossTotal:N2} VAT ₱{sale.VatAmount:N2}{(sale.DiscountType != SaleDiscountType.None ? $", {sale.DiscountType} ID {sale.DiscountIdNumber}" : "")}, Issued {billing.InvoiceNumber}",
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
                 });
 
