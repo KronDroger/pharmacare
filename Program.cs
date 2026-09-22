@@ -13,12 +13,18 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// ---- Identity + RBAC (Roles) ----
+// ---- Identity + RBAC (Roles) + Login Security ----
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequireUppercase = false;
-        options.Password.RequiredLength = 6;
+        options.Password.RequiredLength = 8;
+
+        // Brute-force protection: 5 failed attempts lock the account for 15 minutes.
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+
         options.SignIn.RequireConfirmedAccount = false;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -30,7 +36,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-builder.Services.AddHttpClient<IRecaptchaService, RecaptchaService>();
 builder.Services.AddScoped<ICurrentCustomerService, CurrentCustomerService>();
 builder.Services.AddSingleton<CarePlusPharmacy.Services.PricingService>();
 builder.Services.AddControllersWithViews()

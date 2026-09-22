@@ -1,6 +1,7 @@
 using CarePlusPharmacy.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 namespace CarePlusPharmacy.Data
 {
@@ -25,6 +26,7 @@ namespace CarePlusPharmacy.Data
 
             var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+            var env = services.GetRequiredService<IHostEnvironment>();
 
             // ---- 1. Roles (RBAC) ----
             foreach (var role in Roles)
@@ -33,12 +35,15 @@ namespace CarePlusPharmacy.Data
                     await roleManager.CreateAsync(new IdentityRole(role));
             }
 
-            // ---- 2. One demo user per role ----
-            await CreateUserIfNotExists(userManager, "admin@careplus.ph", "Admin@123", "Main Admin", "Admin");
-            await CreateUserIfNotExists(userManager, "pharmacist@careplus.ph", "Pharmacist@123", "Pharmacist User", "Pharmacist");
-            await CreateUserIfNotExists(userManager, "cashier@careplus.ph", "Cashier@123", "Cashier User", "Cashier");
-            await CreateUserIfNotExists(userManager, "inventory@careplus.ph", "Inventory@123", "Inventory Coordinator", "InventoryCoordinator");
-            await CreateUserIfNotExists(userManager, "customer@careplus.ph", "Customer@123", "Customer User", "Customer");
+            // ---- 2. One demo user per role (Development only) ----
+            if (env.IsDevelopment())
+            {
+                await CreateUserIfNotExists(userManager, "admin@careplus.ph", "Admin@123", "Main Admin", "Admin");
+                await CreateUserIfNotExists(userManager, "pharmacist@careplus.ph", "Pharmacist@123", "Pharmacist User", "Pharmacist");
+                await CreateUserIfNotExists(userManager, "cashier@careplus.ph", "Cashier@123", "Cashier User", "Cashier");
+                await CreateUserIfNotExists(userManager, "inventory@careplus.ph", "Inventory@123", "Inventory Coordinator", "InventoryCoordinator");
+                await CreateUserIfNotExists(userManager, "customer@careplus.ph", "Customer@123", "Customer User", "Customer");
+            }
 
             // ---- 3. Sample domain data (only if empty) ----
             if (!context.Suppliers.Any())

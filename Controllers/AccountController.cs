@@ -1,6 +1,5 @@
 using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
-using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -12,18 +11,15 @@ namespace CarePlusPharmacy.Controllers
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IRecaptchaService _recaptchaService;
         private readonly ApplicationDbContext _context;
 
         public AccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
-            IRecaptchaService recaptchaService,
             ApplicationDbContext context)
         {
             _signInManager = signInManager;
             _userManager = userManager;
-            _recaptchaService = recaptchaService;
             _context = context;
         }
 
@@ -40,14 +36,6 @@ namespace CarePlusPharmacy.Controllers
         {
             ViewData["ReturnUrl"] = returnUrl;
 
-            var recaptchaToken = Request.Form["g-recaptcha-response"].ToString();
-            var recaptchaResult = await _recaptchaService.VerifyTokenAsync(recaptchaToken, HttpContext.Connection.RemoteIpAddress?.ToString());
-            if (!recaptchaResult.Success)
-            {
-                ModelState.AddModelError(string.Empty, recaptchaResult.ErrorMessage ?? "reCAPTCHA verification failed. Please try again.");
-                return View();
-            }
-
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
                 ModelState.AddModelError(string.Empty, "Email and password are required.");
@@ -57,11 +45,12 @@ namespace CarePlusPharmacy.Controllers
             var user = await _userManager.FindByEmailAsync(email);
             if (user != null && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
             {
-                ModelState.AddModelError(string.Empty, "This account has been deactivated. Please contact an administrator.");
+                ModelState.AddModelError(string.Empty,
+                    "Too many failed sign-in attempts. This account is locked for 15 minutes. Contact an administrator if you believe this is a mistake.");
                 return View();
             }
 
-            var result = await _signInManager.PasswordSignInAsync(email, password, rememberMe, lockoutOnFailure: false);
+            var result = await _signInManager.PasswordSignInAsync(email, password, rememberMe, lockoutOnFailure: true);
             if (result.Succeeded)
             {
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -69,15 +58,17 @@ namespace CarePlusPharmacy.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-            return View();
-        }
+            if (result.IsLockedOut)
+            {
+                ModelState.AddModelError(string.Empty,
+                    "Too many failed sign-in attempts. This account is locked for 15 minutes.");
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+            }
 
-        [HttpPost]
-        public IActionResult ConfirmCaptcha()
-        {
-            var token = _recaptchaService.GenerateChallengeToken();
-            return Json(new { success = true, token });
+            return View();
         }
 
         [HttpGet]
