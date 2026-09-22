@@ -69,7 +69,7 @@
                     <input type="text" name="search" value="@(ViewBag.Search)" class="form-control border-start-0" placeholder="Customer name, sale #, or invoice #..." />
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">PAYMENT METHOD</label>
                 <select name="paymentMethod" class="form-select form-select-sm">
                     <option value="">All Methods</option>
@@ -77,6 +77,13 @@
                     <option value="GCash" selected="@(ViewBag.PaymentMethod == "GCash")">GCash</option>
                     <option value="Card" selected="@(ViewBag.PaymentMethod == "Card")">Card</option>
                     <option value="PayMongo" selected="@(ViewBag.PaymentMethod == "PayMongo")">PayMongo</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">STATUS</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="Active" selected="@(ViewBag.Status == "Active")">Active</option>
+                    <option value="Voided" selected="@(ViewBag.Status == "Voided")">Voided</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -134,12 +141,18 @@
                 }
                 @foreach (var s in Model)
                 {
-                    <tr>
+                    <tr class="@(s.IsVoided ? "table-light opacity-75" : "")">
                         <td>
                             <span class="fw-bold text-dark">#@s.Id</span>
                             <div class="text-muted" style="font-size: 11px;">
                                 @(s.Billing?.InvoiceNumber ?? $"INV-{s.Id:D5}")
                             </div>
+                            @if (s.IsVoided)
+                            {
+                                <span class="badge mt-1" style="background: var(--cp-danger-bg); color: var(--cp-danger);" title="@s.VoidReason">
+                                    <i class="bi bi-slash-circle me-1"></i>VOIDED
+                                </span>
+                            }
                         </td>
                         <td>
                             <div>@s.SaleDate.ToString("yyyy-MM-dd")</div>
@@ -183,10 +196,14 @@
                             </div>
                         </td>
                         <td class="num">
-                            <div class="fw-bold fs-6 text-dark">₱@s.TotalAmount.ToString("N2")</div>
+                            <div class="fw-bold fs-6 @(s.IsVoided ? "text-decoration-line-through text-muted" : "text-dark")">₱@s.TotalAmount.ToString("N2")</div>
                             @if (s.DiscountAmount > 0)
                             {
                                 <div class="text-success" style="font-size: 11px;">-₱@s.DiscountAmount.ToString("N2") disc.</div>
+                            }
+                            @if (s.IsVoided)
+                            {
+                                <div class="text-danger" style="font-size: 11px;" title="@s.VoidReason">Refunded</div>
                             }
                         </td>
                         <td>
@@ -196,6 +213,19 @@
                             <a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-careplus py-1 px-2" style="font-size: 12px;">
                                 <i class="bi bi-receipt me-1"></i> Receipt
                             </a>
+                            @if (User.IsInRole("Admin") || User.IsInRole("Pharmacist"))
+                            {
+                                if (!s.IsVoided)
+                                {
+                                    <form method="post" asp-action="Void" asp-route-id="@s.Id" class="d-inline"
+                                          onsubmit="var r = prompt('Reason for voiding Sale #@s.Id (required):',''); if(!r || !r.trim()){alert('A reason is required.'); return false;} this.querySelector('[name=voidReason]').value = r.trim(); return confirm('Voiding returns stock to inventory, reverses loyalty points, and refunds the invoice. Continue?');">
+                                        <input type="hidden" name="voidReason" value="" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 12px;" title="Void / refund this sale">
+                                            <i class="bi bi-slash-circle"></i> Void
+                                        </button>
+                                    </form>
+                                }
+                            }
                         </td>
                     </tr>
                 }

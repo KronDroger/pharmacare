@@ -25,7 +25,17 @@
 </div>
 
 <!-- Receipt Presentation Card -->
-<div class="receipt-wrapper">
+<div class="receipt-wrapper @(Model.IsVoided ? "receipt-voided" : "")">
+    @if (Model.IsVoided)
+    {
+        <div class="text-center mb-3">
+            <span class="fs-3 fw-black" style="color: #b00020; letter-spacing: 4px;">VOIDED / REFUNDED</span>
+            <div style="font-size: 11px;" class="text-danger mt-1">@Model.VoidReason</div>
+            <div style="font-size: 10.5px;" class="text-muted">
+                Voided on @(Model.VoidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-") by @(Model.VoidedBy?.FullName ?? Model.VoidedBy?.UserName ?? "Staff")
+            </div>
+        </div>
+    }
     <!-- Header with CarePlus Logo -->
     <div class="text-center mb-3">
         <img src="~/images/careplus-icon.svg" alt="CarePlus Logo" style="width: 44px; height: 44px; margin-bottom: 6px;" />

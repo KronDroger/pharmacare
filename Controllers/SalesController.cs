@@ -25,9 +25,19 @@ namespace CarePlusPharmacy.Controllers
         }
 
         // List all sales transactions
-        public async Task<IActionResult> Index(string? search, string? paymentMethod, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? paymentMethod, string? status, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
         {
             var baseQuery = _context.Sales.AsQueryable();
+
+            // Voided / Active ledger filter (active by default so KPIs stay intact)
+            if (string.Equals(status, "Voided", StringComparison.OrdinalIgnoreCase))
+            {
+                baseQuery = baseQuery.Where(s => s.IsVoided);
+            }
+            else
+            {
+                baseQuery = baseQuery.Where(s => !s.IsVoided);
+            }
 
             // Filters (Sales ledger search + payment method + date range)
             if (!string.IsNullOrWhiteSpace(search))
@@ -65,6 +75,7 @@ namespace CarePlusPharmacy.Controllers
 
             ViewBag.Search = search;
             ViewBag.PaymentMethod = paymentMethod;
+            ViewBag.Status = string.Equals(status, "Voided", StringComparison.OrdinalIgnoreCase) ? "Voided" : "Active";
             ViewBag.From = from?.ToString("yyyy-MM-dd");
             ViewBag.To = to?.ToString("yyyy-MM-dd");
 
@@ -465,6 +476,116 @@ namespace CarePlusPharmacy.Controllers
             }
         }
 
+        // Void / refund a completed sale — returns stock to its original batches,
+        // reverses loyalty points, marks the invoice refunded, and audit-logs the reason.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,Pharmacist")]
+        public async Task<IActionResult> Void(int id, string? voidReason)
+        {
+            voidReason = (voidReason ?? string.Empty).Trim();
+            if (voidReason.Length > 500)
+            {
+                return BadRequest(new { success = false, message = "Void reason must be 500 characters or fewer." });
+            }
+
+            var sale = await _context.Sales
+                .Include(s => s.Details).ThenInclude(d => d.Batch)
+                .Include(s => s.Details).ThenInclude(d => d.Medicine)
+                .Include(s => s.Billing)
+                .Include(s => s.Customer)
+                .FirstOrDefaultAsync(s => s.Id == id);
+            if (sale == null) return NotFound();
+
+            if (sale.IsVoided)
+            {
+                return BadRequest(new { success = false, message = $"Sale #{sale.Id} is already voided." });
+            }
+
+            // Guard the Phase-4 rule: only an Admin may void a sale that dispensed an
+            // Rx medicine (fulfilling a prescription), because voiding reopens it.
+            var linkedRx = await _context.Prescriptions.FirstOrDefaultAsync(p => p.SaleId == sale.Id);
+            if (linkedRx != null && !User.IsInRole("Admin"))
+            {
+                return BadRequest(new { success = false, message = "Only an Admin can void a sale that fulfilled a prescription, because it reopens the Rx. Ask an Admin or submit the operation from the Admin account." });
+            }
+
+            var operatorUser = await _userManager.GetUserAsync(User);
+            if (operatorUser == null) return Challenge();
+
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1) Return stock to the exact batches that were sold
+                foreach (var detail in sale.Details)
+                {
+                    if (detail.BatchId.HasValue && detail.Batch != null)
+                    {
+                        detail.Batch.Quantity += detail.Quantity;
+                    }
+                }
+
+                // 2) Reverse loyalty points (undo earning, return redemptions)
+                if (sale.Customer != null)
+                {
+                    sale.Customer.LoyaltyPoints = Math.Max(0,
+                        sale.Customer.LoyaltyPoints - sale.PointsEarned + sale.PointsRedeemed);
+                }
+
+                // 3) Mark invoice as refunded
+                if (sale.Billing != null)
+                {
+                    sale.Billing.PaymentStatus = PaymentStatus.Refunded;
+                }
+
+                // 4) Flag the sale + record who/when/why
+                sale.IsVoided = true;
+                sale.VoidReason = voidReason;
+                sale.VoidedById = operatorUser.Id;
+                sale.VoidedAt = DateTime.Now;
+
+                // 5) If this sale dispensed a prescription, reopen it for re-dispensing
+                if (linkedRx != null)
+                {
+                    linkedRx.Status = PrescriptionStatus.Pending;
+                    linkedRx.SaleId = null;
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        Timestamp = DateTime.Now,
+                        UserId = operatorUser.Id,
+                        UserName = operatorUser.FullName ?? operatorUser.UserName ?? "Staff",
+                        UserRole = "Admin",
+                        Action = "PRESCRIPTION_REOPENED",
+                        Module = "Prescriptions",
+                        Details = $"Rx #{linkedRx.Id} reopened (void of Sale #{sale.Id}) — Sale #{sale.Id} voided",
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    });
+                }
+
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Timestamp = DateTime.Now,
+                    UserId = operatorUser.Id,
+                    UserName = operatorUser.FullName ?? operatorUser.UserName ?? "Staff",
+                    UserRole = User.IsInRole("Admin") ? "Admin" : "Pharmacist",
+                    Action = "SALE_VOIDED",
+                    Module = "Sales & POS",
+                    Details = $"Voided Sale #{sale.Id} ({(sale.Billing != null ? sale.Billing.InvoiceNumber : "no invoice")}) — {sale.VatAmount:N2} VAT, refunded gross ₱{sale.TotalAmount:N2}. Reason: {voidReason}",
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                });
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { success = true, saleId = sale.Id });
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
         // Sale / Receipt Details (Printable official pharmacy layout)
         public async Task<IActionResult> Details(int? id)
         {
@@ -472,6 +593,7 @@ namespace CarePlusPharmacy.Controllers
             var sale = await _context.Sales
                 .Include(s => s.Customer)
                 .Include(s => s.Cashier)
+                .Include(s => s.VoidedBy)
                 .Include(s => s.Details).ThenInclude(d => d.Medicine)
                 .Include(s => s.Details).ThenInclude(d => d.Batch)
                 .Include(s => s.Billing)

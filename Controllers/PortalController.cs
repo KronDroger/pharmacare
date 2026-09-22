@@ -112,7 +112,7 @@ namespace CarePlusPharmacy.Controllers
                 return View(empty);
             }
 
-            var baseQuery = _context.Sales.Where(s => s.CustomerId == customer.Id);
+            var baseQuery = _context.Sales.Where(s => s.CustomerId == customer.Id && !s.IsVoided);
 
             if (!string.IsNullOrWhiteSpace(search))
             {

@@ -1152,6 +1152,11 @@ html.sidebar-pre-collapsed .app-shell .sidebar .brand {
   box-shadow: var(--shadow-md);
 }
 
+.receipt-wrapper.receipt-voided {
+  filter: grayscale(0.6);
+  border: 2px dashed #b00020;
+}
+
 .invoice-wrapper {
   background: #ffffff;
   border: 1px solid var(--cp-border);

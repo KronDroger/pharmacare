@@ -32,6 +32,7 @@ namespace CarePlusPharmacy.Controllers
         public async Task<IActionResult> Index(int medPage = 1, int medPageSize = 10, int custPage = 1, int custPageSize = 10, bool print = false)
         {
             var sales = await _context.Sales
+                .Where(s => !s.IsVoided)
                 .Include(s => s.Customer)
                 .Include(s => s.Details).ThenInclude(d => d.Medicine)
                 .ToListAsync();
@@ -91,8 +92,8 @@ namespace CarePlusPharmacy.Controllers
                 {
                     CustomerName = c.FullName,
                     Tier = c.Tier,
-                    OrdersCount = c.Sales.Count,
-                    TotalSpent = c.Sales.Sum(s => s.TotalAmount),
+                    OrdersCount = c.Sales.Count(x => !x.IsVoided),
+                    TotalSpent = c.Sales.Where(x => !x.IsVoided).Sum(s => s.TotalAmount),
                     LoyaltyPoints = c.LoyaltyPoints
                 })
                 .OrderByDescending(c => c.TotalSpent);

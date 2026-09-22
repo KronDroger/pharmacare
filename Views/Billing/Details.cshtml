@@ -40,9 +40,18 @@
             </div>
         </div>
         <div class="col-sm-5 text-sm-end mt-3 mt-sm-0">
-            <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 mb-2">
-                <i class="bi bi-check-circle-fill me-1"></i> @Model.PaymentStatus
-            </div>
+            @if (Model.PaymentStatus == CarePlusPharmacy.Models.PaymentStatus.Refunded)
+            {
+                <div class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fs-6 mb-2" style="background: var(--cp-danger-bg); color: var(--cp-danger);">
+                    <i class="bi bi-slash-circle me-1"></i> @Model.PaymentStatus
+                </div>
+            }
+            else
+            {
+                <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 mb-2">
+                    <i class="bi bi-check-circle-fill me-1"></i> @Model.PaymentStatus
+                </div>
+            }
             <div class="fw-bold fs-5 text-dark font-monospace">@Model.InvoiceNumber</div>
             <div class="text-muted" style="font-size: 12px;">Date: @Model.DateIssued.ToString("MMMM dd, yyyy")</div>
             <div class="text-muted" style="font-size: 11px;">Ref: Sale Transaction #@Model.SaleId</div>

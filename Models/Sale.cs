@@ -54,6 +54,22 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "Points Redeemed")]
         public int PointsRedeemed { get; set; } = 0;
 
+        // Void / refund of a completed sale. Stock is returned to the original
+        // batches, points are reversed, and the invoice is marked Refunded.
+        [Display(Name = "Voided")]
+        public bool IsVoided { get; set; } = false;
+
+        [StringLength(500)]
+        [Display(Name = "Void Reason")]
+        public string? VoidReason { get; set; }
+
+        [Display(Name = "Voided By")]
+        public string? VoidedById { get; set; }
+        public ApplicationUser? VoidedBy { get; set; }
+
+        [Display(Name = "Voided At")]
+        public DateTime? VoidedAt { get; set; }
+
         public ICollection<SaleDetail> Details { get; set; } = new List<SaleDetail>();
 
         [Display(Name = "Gross Total")]

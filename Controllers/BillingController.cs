@@ -17,10 +17,11 @@ namespace CarePlusPharmacy.Controllers
         public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
             var baseQuery = _context.Billings.AsQueryable();
+            var kpiQuery = baseQuery.Where(b => b.Sale == null || !b.Sale!.IsVoided);
 
-            ViewBag.TotalBilledAll = await baseQuery.SumAsync(b => b.AmountDue);
-            ViewBag.TotalPaidAll = await baseQuery.Where(b => b.PaymentStatus == PaymentStatus.Paid).SumAsync(b => b.AmountDue);
-            ViewBag.TotalCountAll = await baseQuery.CountAsync();
+            ViewBag.TotalBilledAll = await kpiQuery.SumAsync(b => b.AmountDue);
+            ViewBag.TotalPaidAll = await kpiQuery.Where(b => b.PaymentStatus == PaymentStatus.Paid).SumAsync(b => b.AmountDue);
+            ViewBag.TotalCountAll = await kpiQuery.CountAsync();
 
             var query = baseQuery
                 .Include(b => b.Sale).ThenInclude(s => s!.Customer)

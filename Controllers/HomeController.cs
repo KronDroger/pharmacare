@@ -26,6 +26,7 @@ namespace CarePlusPharmacy.Controllers
             }
             var medicines = await _context.Medicines.Include(m => m.Batches).ToListAsync();
             var sales = await _context.Sales
+                .Where(s => !s.IsVoided)
                 .Include(s => s.Details).ThenInclude(d => d.Medicine)
                 .Include(s => s.Customer)
                 .OrderByDescending(s => s.SaleDate)
