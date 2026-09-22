@@ -140,6 +140,13 @@ namespace CarePlusPharmacy.Controllers
                 return RedirectToAction(nameof(Browse));
             }
 
+            // Default the pickup branch to the pharmacy's main branch; customers can
+            // change it any time from the portal (Portal/Subscriptions).
+            var pickupBranch = await _context.Branches
+                .OrderBy(b => b.IsMainBranch ? 0 : 1)
+                .ThenBy(b => b.Id)
+                .FirstOrDefaultAsync();
+
             var subscription = new CustomerSubscription
             {
                 CustomerId = customer.Id,
@@ -147,32 +154,20 @@ namespace CarePlusPharmacy.Controllers
                 StartDate = DateTime.Today,
                 NextRefillDate = DateTime.Today.AddDays(plan.IntervalDays),
                 Status = SubscriptionStatus.Active,
-                PaymentMethod = "Cash"
+                PaymentMethod = "Cash",
+                PickupBranchId = pickupBranch?.Id
             };
             _context.Add(subscription);
             await _context.SaveChangesAsync();
             TempData["Success"] = $"Subscribed to {plan.Name}. First refill due {subscription.NextRefillDate:yyyy-MM-dd}.";
-            return RedirectToAction(nameof(MySubscriptions));
+            return RedirectToAction("Subscriptions", "Portal");
         }
 
         [Authorize(Roles = "Customer")]
-        public async Task<IActionResult> MySubscriptions(int page = 1, int pageSize = 10)
+        public IActionResult MySubscriptions()
         {
-            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
-            if (customer == null)
-            {
-                var empty = new PaginatedList<CustomerSubscription>(new List<CustomerSubscription>(), 0, 1, pageSize);
-                return View(empty);
-            }
-
-            var query = _context.CustomerSubscriptions
-                .Include(s => s.SubscriptionPlan).ThenInclude(p => p!.Medicine)
-                .Where(s => s.CustomerId == customer.Id)
-                .OrderByDescending(s => s.Status == SubscriptionStatus.Active)
-                .ThenBy(s => s.NextRefillDate);
-
-            var subs = await PaginatedList<CustomerSubscription>.CreateAsync(query, page, pageSize);
-            return View(subs);
+            // Customer subscription management now lives in the portal.
+            return RedirectToAction("Subscriptions", "Portal");
         }
 
         [Authorize(Roles = "Customer")]
@@ -188,7 +183,7 @@ namespace CarePlusPharmacy.Controllers
                 await _context.SaveChangesAsync();
                 TempData["Success"] = "Subscription cancelled.";
             }
-            return RedirectToAction(nameof(MySubscriptions));
+            return RedirectToAction("Subscriptions", "Portal");
         }
 
         // ---------- ADMIN/CASHIER: DUE REFILLS ----------

@@ -270,6 +270,63 @@ body {
   flex-shrink: 0;
 }
 
+/* Customer portal patient card (read-only summary pinned to the sidebar) */
+.sidebar-patient-card {
+  display: flex;
+  margin: 14px 12px 2px 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: all 0.28s ease;
+}
+
+.sidebar-patient-card .patient-avatar {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cp-forest-deep);
+  background: linear-gradient(135deg, var(--cp-mint) 0%, #4ade80 100%);
+}
+
+.sidebar-patient-card .patient-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.sidebar-patient-card .patient-meta {
+  font-size: 10.5px;
+  color: rgba(167, 216, 203, 0.75);
+  line-height: 1.4;
+}
+
+.app-shell.sidebar-collapsed .sidebar-patient-card {
+  margin: 14px 6px 2px 6px;
+  padding: 8px;
+  justify-content: center;
+}
+
+.app-shell.sidebar-collapsed .sidebar-patient-card .patient-avatar {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-patient-card .patient-name,
+.app-shell.sidebar-collapsed .sidebar-patient-card .patient-meta {
+  display: none;
+}
+
 .sidebar-footer {
   margin-top: auto;
   font-size: 11px;

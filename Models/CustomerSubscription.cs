@@ -30,6 +30,10 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "Status")]
         public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Active;
 
+        [Display(Name = "Pickup Branch")]
+        public int? PickupBranchId { get; set; }
+        public Branch? Branch { get; set; }
+
         [StringLength(30)]
         [Display(Name = "Payment Method")]
         public string PaymentMethod { get; set; } = "Cash";

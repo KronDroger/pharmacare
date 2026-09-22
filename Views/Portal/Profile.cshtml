@@ -1,0 +1,100 @@
+@model CarePlusPharmacy.Models.Customer?
+@{
+    ViewData["Title"] = "My Profile";
+}
+
+@if (Model == null)
+{
+    <div class="table-card p-5 text-center">
+        <i class="bi bi-person-x fs-1 text-muted d-block mb-3"></i>
+        <div class="fw-bold fs-5">No linked patient profile</div>
+        <div class="text-muted mt-1">Ask the pharmacy to link your account to your patient record so you can use the portal.</div>
+    </div>
+    return;
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="table-card h-100">
+            <div class="p-4 text-center">
+                <div class="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle" style="width: 72px; height: 72px; background-color: var(--cp-mint-subtle); color: var(--cp-forest-deep); font-size: 26px; font-weight: 700;">
+                    @Model.FullName.Substring(0, 1).ToUpper()
+                </div>
+                <div class="fw-bold fs-5">@Model.FullName</div>
+                <div class="text-muted" style="font-size: 13px;">@Model.Email</div>
+                <div class="mt-2">
+                    <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);">@Model.Tier</span>
+                </div>
+                <hr />
+                <div class="d-flex justify-content-around">
+                    <div>
+                        <div class="fw-bold fs-5 text-warning">@Model.LoyaltyPoints</div>
+                        <div class="text-muted" style="font-size: 11px;">Points</div>
+                    </div>
+                    <div>
+                        <div class="fw-bold fs-5">@Model.DateRegistered.ToString("yyyy-MM-dd")</div>
+                        <div class="text-muted" style="font-size: 11px;">Patient Since</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="table-card">
+            <div class="table-card-header">
+                <div>
+                    <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-pencil-square text-success me-2"></i>Edit Profile</div>
+                    <div class="text-muted" style="font-size: 12px;">Keep your contact details current so the pharmacy can reach you</div>
+                </div>
+            </div>
+
+            <form asp-action="Profile" method="post" class="p-4">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Email <span class="text-muted fst-italic">(read-only)</span></label>
+                        <input type="email" class="form-control" value="@Model.Email" disabled />
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="FullName" class="form-label"></label>
+                        <input asp-for="FullName" class="form-control" />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Phone" class="form-label"></label>
+                        <input asp-for="Phone" class="form-control" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Address" class="form-label"></label>
+                        <input asp-for="Address" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="City" class="form-label"></label>
+                        <input asp-for="City" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="DateOfBirth" class="form-label"></label>
+                        <input asp-for="DateOfBirth" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Gender" class="form-label"></label>
+                        <select asp-for="Gender" class="form-select">
+                            <option value="">Not specified</option>
+                            <option>Male</option>
+                            <option>Female</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-careplus"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

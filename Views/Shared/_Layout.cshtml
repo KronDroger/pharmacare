@@ -1,4 +1,5 @@
 @inject CarePlusPharmacy.Data.ApplicationDbContext DbContext
+@inject CarePlusPharmacy.Services.ICurrentCustomerService CurrCustomerService
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,12 +32,24 @@
     // Query quick counts for alert badges
     int nearExpiryCount = 0;
     int lowStockCount = 0;
+    CarePlusPharmacy.Models.Customer? portalCustomer = null;
+    int activeSubCount = 0;
     try
     {
         var now = DateTime.Today;
         var warnDate = now.AddDays(90);
         nearExpiryCount = DbContext.MedicineBatches.Count(b => b.ExpiryDate <= warnDate && b.Quantity > 0);
         lowStockCount = DbContext.Medicines.Count(m => m.Batches.Sum(b => b.Quantity) <= m.ReorderLevel);
+
+        if (User.IsInRole("Customer"))
+        {
+            portalCustomer = await CurrCustomerService.GetCurrentCustomerAsync(User);
+            if (portalCustomer != null)
+            {
+                activeSubCount = DbContext.CustomerSubscriptions.Count(s =>
+                    s.CustomerId == portalCustomer.Id && s.Status == CarePlusPharmacy.Models.SubscriptionStatus.Active);
+            }
+        }
     }
     catch { }
 
@@ -121,6 +134,58 @@
                     }
                 }
 
+                <!-- SECTION: MY ACCOUNT (Customer Portal) -->
+                @if (User.IsInRole("Customer"))
+                {
+                    <div class="sidebar-patient-card">
+                        <div class="patient-avatar">
+                            @(portalCustomer != null ? portalCustomer.FullName.Substring(0, 1).ToUpper() : (User.Identity!.Name?.Substring(0, 1).ToUpper() ?? "U"))
+                        </div>
+                        <div class="ms-2" style="min-width: 0;">
+                            <div class="patient-name text-truncate">@(portalCustomer?.FullName ?? User.Identity.Name)</div>
+                            <div class="patient-meta">
+                                @if (portalCustomer != null)
+                                {
+                                    @portalCustomer.Tier <span>·</span> <span class="text-warning">@portalCustomer.LoyaltyPoints pts</span>
+                                }
+                                else
+                                {
+                                    <span class="fst-italic">Not linked yet</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section-title">My Account</div>
+
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Index" ? "active" : "")" asp-controller="Portal" asp-action="Index" data-bs-toggle="tooltip" data-bs-placement="right" title="My Dashboard">
+                        <i class="bi bi-speedometer2"></i> <span class="nav-text">My Dashboard</span>
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Profile" ? "active" : "")" asp-controller="Portal" asp-action="Profile" data-bs-toggle="tooltip" data-bs-placement="right" title="My Profile">
+                        <i class="bi bi-person-vcard"></i> <span class="nav-text">My Profile</span>
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Purchases" ? "active" : "")" asp-controller="Portal" asp-action="Purchases" data-bs-toggle="tooltip" data-bs-placement="right" title="My Purchases">
+                        <i class="bi bi-bag-check"></i> <span class="nav-text">My Purchases</span>
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Prescriptions" ? "active" : "")" asp-controller="Portal" asp-action="Prescriptions" data-bs-toggle="tooltip" data-bs-placement="right" title="My Prescriptions">
+                        <i class="bi bi-file-earmark-medical"></i> <span class="nav-text">My Prescriptions</span>
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Rewards" ? "active" : "")" asp-controller="Portal" asp-action="Rewards" data-bs-toggle="tooltip" data-bs-placement="right" title="My Rewards &amp; Points">
+                        <i class="bi bi-gift"></i> <span class="nav-text">My Rewards</span>
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Subscriptions" ? "active" : "")" asp-controller="Portal" asp-action="Subscriptions" data-bs-toggle="tooltip" data-bs-placement="right" title="My Subscriptions">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span class="nav-text">My Subscriptions</span>
+                        @if (activeSubCount > 0)
+                        {
+                            <span class="badge nav-badge" style="background-color: var(--cp-success); color: #ffffff;">@activeSubCount active</span>
+                        }
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "Browse" ? "active" : "")" asp-controller="Subscriptions" asp-action="Browse" data-bs-toggle="tooltip" data-bs-placement="right" title="Browse Refill Plans">
+                        <i class="bi bi-shop"></i> <span class="nav-text">Browse Refill Plans</span>
+                    </a>
+                }
+
                 <!-- SECTION: CRM & HEALTHCARE -->
                 @if (!User.IsInRole("InventoryCoordinator"))
                 {
@@ -145,15 +210,6 @@
                     {
                         <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "DueRefills" ? "active" : "")" asp-controller="Subscriptions" asp-action="DueRefills" data-bs-toggle="tooltip" data-bs-placement="right" title="Due Refills">
                             <i class="bi bi-clock-history"></i> <span class="nav-text">Due Refills</span>
-                        </a>
-                    }
-                    @if (User.IsInRole("Customer"))
-                    {
-                        <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "Browse" ? "active" : "")" asp-controller="Subscriptions" asp-action="Browse" data-bs-toggle="tooltip" data-bs-placement="right" title="Refill Plans">
-                            <i class="bi bi-arrow-repeat"></i> <span class="nav-text">Refill Plans</span>
-                        </a>
-                        <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "MySubscriptions" ? "active" : "")" asp-controller="Subscriptions" asp-action="MySubscriptions" data-bs-toggle="tooltip" data-bs-placement="right" title="My Subscriptions">
-                            <i class="bi bi-person-circle"></i> <span class="nav-text">My Subscriptions</span>
                         </a>
                     }
                 }

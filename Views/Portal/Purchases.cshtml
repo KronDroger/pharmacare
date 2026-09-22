@@ -1,0 +1,163 @@
+@model CarePlusPharmacy.Models.PaginatedList<Sale>
+@{
+    ViewData["Title"] = "My Purchases";
+    int filteredCount = ViewBag.FilteredCount ?? 0;
+    decimal filteredSpent = ViewBag.FilteredSpent ?? 0m;
+}
+
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="stat-card">
+        <div class="stat-icon icon-blue">
+            <i class="bi bi-receipt"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Transactions</div>
+            <div class="stat-value">@filteredCount</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-muted small">matching current filters</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon icon-green">
+            <i class="bi bi-wallet2"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Total Spent</div>
+            <div class="stat-value">₱@filteredSpent.ToString("N2")</div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-muted small">matching current filters</span>
+        </div>
+    </div>
+</div>
+
+<div class="table-card mb-3">
+    <div class="p-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">SEARCH</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text" style="background-color: var(--cp-surface-elevated);"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" value="@(ViewBag.Search)" class="form-control" placeholder="Sale #, invoice #, or medicine..." />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">PAYMENT METHOD</label>
+                <select name="paymentMethod" class="form-select form-select-sm">
+                    <option value="">All Methods</option>
+                    <option value="Cash" selected="@(ViewBag.PaymentMethod == "Cash")">Cash</option>
+                    <option value="GCash" selected="@(ViewBag.PaymentMethod == "GCash")">GCash</option>
+                    <option value="Card" selected="@(ViewBag.PaymentMethod == "Card")">Card</option>
+                    <option value="PayMongo" selected="@(ViewBag.PaymentMethod == "PayMongo")">PayMongo</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">FROM</label>
+                <input type="date" name="from" value="@(ViewBag.From)" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">TO</label>
+                <input type="date" name="to" value="@(ViewBag.To)" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-careplus flex-fill"><i class="bi bi-funnel me-1"></i>Apply</button>
+                <a asp-action="Purchases" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-bag-check text-success me-2"></i>Purchase History</div>
+            <div class="text-muted" style="font-size: 12px;">Every transaction recorded under your patient record</div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Invoice / Sale #</th>
+                    <th>Date &amp; Time</th>
+                    <th>Payment Method</th>
+                    <th>Items Dispensed</th>
+                    <th class="num">Total</th>
+                    <th>Points</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="bi bi-bag-x fs-2 d-block mb-2 text-muted"></i>
+                            No purchases match your filters.
+                        </td>
+                    </tr>
+                }
+                @foreach (var s in Model)
+                {
+                    <tr>
+                        <td>
+                            <span class="fw-bold">#@s.Id</span>
+                            <div class="text-muted" style="font-size: 11px;">@(s.Billing?.InvoiceNumber ?? $"INV-{s.Id:D5}")</div>
+                        </td>
+                        <td>
+                            <div>@s.SaleDate.ToString("yyyy-MM-dd")</div>
+                            <div class="text-muted" style="font-size: 11px;">@s.SaleDate.ToString("hh:mm tt")</div>
+                        </td>
+                        <td>
+                            @if (s.PaymentMethod == "Cash")
+                            {
+                                <span class="badge" style="background-color: var(--cp-mint-subtle); color: var(--cp-forest);"><i class="bi bi-cash me-1"></i>Cash</span>
+                            }
+                            else if (s.PaymentMethod == "GCash")
+                            {
+                                <span class="badge text-primary border border-primary-subtle" style="background-color: var(--cp-info-bg);"><i class="bi bi-phone me-1"></i>GCash</span>
+                            }
+                            else if (s.PaymentMethod == "Card")
+                            {
+                                <span class="badge text-info border border-info-subtle" style="background-color: rgba(13,110,253,0.08);"><i class="bi bi-credit-card me-1"></i>Card</span>
+                            }
+                            else
+                            {
+                                <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);"><i class="bi bi-shield-check me-1"></i>PayMongo</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge" style="background-color: var(--cp-mint-subtle); color: var(--cp-forest);">@s.Details.Count item(s)</span>
+                            <div class="text-muted text-truncate" style="font-size: 11.5px; max-width: 220px;" title="@string.Join(", ", s.Details.Select(d => $"{d.Medicine?.Name} ({d.Quantity})"))">
+                                @string.Join(", ", s.Details.Select(d => $"{d.Medicine?.Name} ({d.Quantity})"))
+                            </div>
+                        </td>
+                        <td class="num fw-bold">₱@s.TotalAmount.ToString("N2")</td>
+                        <td>
+                            @if (s.PointsEarned > 0)
+                            {
+                                <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);"><i class="bi bi-plus-lg me-1"></i>+@s.PointsEarned</span>
+                            }
+                            @if (s.PointsRedeemed > 0)
+                            {
+                                <span class="badge" style="background-color: var(--cp-danger-bg); color: var(--cp-danger);"><i class="bi bi-dash-lg me-1"></i>-@s.PointsRedeemed</span>
+                            }
+                            @if (s.PointsEarned == 0 && s.PointsRedeemed == 0)
+                            {
+                                <span class="text-muted" style="font-size: 12px;">—</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a asp-action="PurchaseDetails" asp-route-id="@s.Id" class="btn btn-sm btn-outline-careplus py-1 px-2" style="font-size: 12px;">
+                                <i class="bi bi-receipt me-1"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @await Html.PartialAsync("_Pagination", Model)
+</div>

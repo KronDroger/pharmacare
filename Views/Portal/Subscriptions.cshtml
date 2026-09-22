@@ -1,0 +1,105 @@
+@model CarePlusPharmacy.Models.PaginatedList<CustomerSubscription>
+@{
+    ViewData["Title"] = "My Subscriptions";
+    var branches = ViewBag.Branches as List<CarePlusPharmacy.Models.Branch> ?? new List<CarePlusPharmacy.Models.Branch>();
+}
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-arrow-repeat text-success me-2"></i>My Subscriptions</div>
+            <div class="text-muted" style="font-size: 12px;">Manage your refill subscriptions and pickup branch</div>
+        </div>
+        <a asp-controller="Subscriptions" asp-action="Browse" class="btn btn-sm btn-careplus">Browse Plans</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Plan</th>
+                    <th>Next Refill</th>
+                    <th>Pickup Branch</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-5">You have no subscriptions yet. <a asp-controller="Subscriptions" asp-action="Browse">Browse plans</a>.</td></tr>
+                }
+                @foreach (var s in Model)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-bold">@s.SubscriptionPlan?.Name</div>
+                            <div class="text-muted" style="font-size: 11.5px;">@s.SubscriptionPlan?.Medicine?.Name · ₱@(s.SubscriptionPlan?.Price.ToString("N2")) / refill</div>
+                        </td>
+                        <td>@s.NextRefillDate.ToString("yyyy-MM-dd")</td>
+                        <td style="min-width: 200px;">
+                            @if (s.Status != SubscriptionStatus.Cancelled)
+                            {
+                                <form asp-action="SetPickupBranch" asp-route-id="@s.Id" method="post" class="d-flex gap-1 align-items-center">
+                                    @Html.AntiForgeryToken()
+                                    <select name="pickupBranchId" class="form-select form-select-sm" style="width: 155px;">
+                                        <option value="">Select branch</option>
+                                        @foreach (var b in branches)
+                                        {
+                                            <option value="@b.Id" selected="@(s.PickupBranchId == b.Id)">@b.Name</option>
+                                        }
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-careplus py-1 px-2" title="Set pickup branch" style="font-size: 12px;">
+                                        <i class="bi bi-geo-alt"></i>
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@(s.Branch?.Name ?? "—")</span>
+                            }
+                        </td>
+                        <td>
+                            @switch (s.Status)
+                            {
+                                case SubscriptionStatus.Active:
+                                    <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);">Active</span>
+                                    break;
+                                case SubscriptionStatus.Paused:
+                                    <span class="badge" style="background-color: var(--cp-warning-bg); color: var(--cp-warning);">Paused</span>
+                                    break;
+                                default:
+                                    <span class="badge bg-secondary">Cancelled</span>
+                                    break;
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (s.Status == SubscriptionStatus.Active)
+                            {
+                                <form asp-action="Pause" asp-route-id="@s.Id" method="post" class="d-inline" onsubmit="return confirm('Pause this subscription?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Pause" style="font-size: 12px;"><i class="bi bi-pause-circle"></i></button>
+                                </form>
+                            }
+                            @if (s.Status == SubscriptionStatus.Paused)
+                            {
+                                <form asp-action="Resume" asp-route-id="@s.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-careplus py-1 px-2" title="Resume" style="font-size: 12px;"><i class="bi bi-play-circle"></i></button>
+                                </form>
+                            }
+                            @if (s.Status != SubscriptionStatus.Cancelled)
+                            {
+                                <form asp-action="Cancel" asp-route-id="@s.Id" method="post" class="d-inline" onsubmit="return confirm('Cancel this subscription?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Cancel" style="font-size: 12px;"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @await Html.PartialAsync("_Pagination", Model)
+</div>

@@ -135,6 +135,12 @@ namespace CarePlusPharmacy.Data
                 .HasForeignKey(s => s.SubscriptionPlanId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<CustomerSubscription>()
+                .HasOne(s => s.Branch)
+                .WithMany()
+                .HasForeignKey(s => s.PickupBranchId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Portal security: an ApplicationUser may only ever resolve to the
             // Customer profile explicitly linked to it (never by email matching).
             builder.Entity<ApplicationUser>()
