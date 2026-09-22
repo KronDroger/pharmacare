@@ -70,9 +70,12 @@
             </div>
 
             <nav class="nav flex-column">
-                <a class="nav-link @(currentCtrl == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-                    <i class="bi bi-grid-1x2-fill"></i> <span class="nav-text">Dashboard</span>
-                </a>
+                @if (!User.IsInRole("Customer"))
+                {
+                    <a class="nav-link @(currentCtrl == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+                        <i class="bi bi-grid-1x2-fill"></i> <span class="nav-text">Dashboard</span>
+                    </a>
+                }
                 <a class="nav-link @(currentCtrl == "Branches" ? "active" : "")" asp-controller="Branches" asp-action="Index" data-bs-toggle="tooltip" data-bs-placement="right" title="Branches">
                     <i class="bi bi-geo-alt-fill"></i> <span class="nav-text">Branches</span>
                 </a>
