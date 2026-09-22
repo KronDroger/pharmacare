@@ -8,5 +8,10 @@ namespace CarePlusPharmacy.Models
     public class ApplicationUser : IdentityUser
     {
         public string FullName { get; set; } = string.Empty;
+
+        // Authoritative link to the pharmacy's Customer record. Set at registration
+        // (or via linking) so the portal never matches patients by email alone.
+        public int? CustomerId { get; set; }
+        public Customer? Customer { get; set; }
     }
 }

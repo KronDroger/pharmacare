@@ -31,6 +31,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddHttpClient<IRecaptchaService, RecaptchaService>();
+builder.Services.AddScoped<ICurrentCustomerService, CurrentCustomerService>();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();

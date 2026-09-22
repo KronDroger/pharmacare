@@ -206,6 +206,56 @@ namespace CarePlusPharmacy.Data
 
             // ---- 4. Ensure Rich 50+ Dataset for Billing, Medicines, Sales, and Customers ----
             await EnsureRichDataSeededAsync(context, userManager);
+
+            // ---- 5. Link demo accounts to their Customer records ----
+            // The portal resolves patients via ApplicationUser.CustomerId, so the demo
+            // customer account must be linked to a matching patient profile on file
+            // (creating one if the demo environment never seeded it).
+            var demoCustomerUser = await userManager.FindByEmailAsync("customer@careplus.ph");
+            var demoCustomer = await context.Customers
+                .FirstOrDefaultAsync(c => c.Email != null && c.Email == "customer@careplus.ph");
+            if (demoCustomerUser != null && demoCustomer == null)
+            {
+                demoCustomer = new Customer
+                {
+                    FullName = demoCustomerUser.FullName ?? "Customer User",
+                    Email = demoCustomerUser.Email,
+                    Phone = "0921-000-0000",
+                    Address = "Davao City",
+                    DateRegistered = DateTime.Today
+                };
+                context.Customers.Add(demoCustomer);
+                await context.SaveChangesAsync();
+            }
+            if (demoCustomerUser != null && demoCustomer != null && !demoCustomerUser.CustomerId.HasValue)
+            {
+                demoCustomerUser.CustomerId = demoCustomer.Id;
+                await userManager.UpdateAsync(demoCustomerUser);
+            }
+
+            // Defensive: if duplicate Patient emails somehow exist, keep the oldest
+            // record's email and blank the duplicates so the unique index never blocks.
+            var dupEmails = await context.Customers
+                .Where(c => c.Email != null && c.Email != "")
+                .GroupBy(c => c.Email!)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToListAsync();
+            foreach (var dupEmail in dupEmails)
+            {
+                var dupes = await context.Customers
+                    .Where(c => c.Email == dupEmail)
+                    .OrderBy(c => c.Id)
+                    .ToListAsync();
+                foreach (var d in dupes.Skip(1))
+                {
+                    d.Email = null;
+                }
+            }
+            if (dupEmails.Any())
+            {
+                await context.SaveChangesAsync();
+            }
         }
 
         private static async Task CreateUserIfNotExists(

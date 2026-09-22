@@ -134,6 +134,20 @@ namespace CarePlusPharmacy.Data
                 .WithMany(p => p.Subscriptions)
                 .HasForeignKey(s => s.SubscriptionPlanId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Portal security: an ApplicationUser may only ever resolve to the
+            // Customer profile explicitly linked to it (never by email matching).
+            builder.Entity<ApplicationUser>()
+                .HasOne(u => u.Customer)
+                .WithMany()
+                .HasForeignKey(u => u.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Email is unique per patient profile (nullable-safe: NULLs are unlimited).
+            // Existing duplicates were resolved in the migration before the index is created.
+            builder.Entity<Customer>()
+                .HasIndex(c => c.Email)
+                .IsUnique();
         }
     }
 }

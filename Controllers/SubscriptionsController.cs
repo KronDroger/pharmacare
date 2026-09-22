@@ -1,5 +1,6 @@
 using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
+using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,11 +17,13 @@ namespace CarePlusPharmacy.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ICurrentCustomerService _currentCustomerService;
 
-        public SubscriptionsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public SubscriptionsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ICurrentCustomerService currentCustomerService)
         {
             _context = context;
             _userManager = userManager;
+            _currentCustomerService = currentCustomerService;
         }
 
         // ---------- ADMIN: PLAN MANAGEMENT ----------
@@ -119,7 +122,7 @@ namespace CarePlusPharmacy.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Subscribe(int planId)
         {
-            var customer = await CurrentCustomerAsync();
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
             if (customer == null)
             {
                 TempData["Error"] = "No customer profile is linked to your account yet. Ask the pharmacy to link your account to a Customer record.";
@@ -155,7 +158,7 @@ namespace CarePlusPharmacy.Controllers
         [Authorize(Roles = "Customer")]
         public async Task<IActionResult> MySubscriptions(int page = 1, int pageSize = 10)
         {
-            var customer = await CurrentCustomerAsync();
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
             if (customer == null)
             {
                 var empty = new PaginatedList<CustomerSubscription>(new List<CustomerSubscription>(), 0, 1, pageSize);
@@ -177,7 +180,7 @@ namespace CarePlusPharmacy.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cancel(int id)
         {
-            var customer = await CurrentCustomerAsync();
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
             var sub = await _context.CustomerSubscriptions.FirstOrDefaultAsync(s => s.Id == id && s.CustomerId == customer!.Id);
             if (sub != null)
             {
@@ -258,13 +261,7 @@ namespace CarePlusPharmacy.Controllers
 
         // ---------- HELPERS ----------
 
-        // Matches the logged-in ApplicationUser to a Customer record by email.
-        // Assumes the pharmacy creates the Customer record with the same email used for the account.
-        private async Task<Customer?> CurrentCustomerAsync()
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user?.Email == null) return null;
-            return await _context.Customers.FirstOrDefaultAsync(c => c.Email == user.Email);
-        }
+        // Resolves the logged-in ApplicationUser's linked Customer record via the
+        // ApplicationUser.CustomerId FK (see ICurrentCustomerService) — never by email.
     }
 }

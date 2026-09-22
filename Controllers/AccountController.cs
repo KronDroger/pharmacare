@@ -4,6 +4,7 @@ using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace CarePlusPharmacy.Controllers
 {
@@ -99,35 +100,84 @@ namespace CarePlusPharmacy.Controllers
                 return View();
             }
 
-            var user = new ApplicationUser { UserName = email, Email = email, FullName = fullName, EmailConfirmed = true };
-            var result = await _userManager.CreateAsync(user, password);
+            email = email.Trim();
 
-            if (result.Succeeded)
+            // Does a patient profile already exist for this email address?
+            var existingCustomer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Email != null && c.Email == email);
+
+            // The account, the role, and the Customer profile (or link) must be
+            // committed together atomically — any failure rolls the whole thing back.
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            try
             {
+                var user = new ApplicationUser { UserName = email, Email = email, FullName = fullName, EmailConfirmed = true };
+                var result = await _userManager.CreateAsync(user, password);
+
+                if (!result.Succeeded)
+                {
+                    await tx.RollbackAsync();
+                    foreach (var error in result.Errors)
+                        ModelState.AddModelError(string.Empty, error.Description);
+                    return View();
+                }
+
                 await _userManager.AddToRoleAsync(user, "Customer");
 
-                var customer = new Customer
+                if (existingCustomer != null)
                 {
-                    FullName = fullName,
-                    Email = email,
-                    Phone = phone,
-                    Address = address,
-                    City = city,
-                    DateOfBirth = dateOfBirth,
-                    Gender = gender,
-                    DateRegistered = DateTime.Today
-                };
-                _context.Customers.Add(customer);
-                await _context.SaveChangesAsync();
+                    // A patient with this email is already on file. Only link the new
+                    // account when the phone matches their record — otherwise the account
+                    // is not created (staff must link it manually).
+                    if (!PhonesMatch(existingCustomer.Phone, phone))
+                    {
+                        await tx.RollbackAsync();
+                        ModelState.AddModelError(string.Empty,
+                            "A patient profile already exists for this email. Contact the pharmacy with your valid ID so staff can link your account.");
+                        return View();
+                    }
+
+                    user.CustomerId = existingCustomer.Id;
+                }
+                else
+                {
+                    var customer = new Customer
+                    {
+                        FullName = fullName,
+                        Email = email,
+                        Phone = phone,
+                        Address = address,
+                        City = city,
+                        DateOfBirth = dateOfBirth,
+                        Gender = gender,
+                        DateRegistered = DateTime.Today
+                    };
+                    _context.Customers.Add(customer);
+                    await _context.SaveChangesAsync();
+
+                    user.CustomerId = customer.Id;
+                }
+
+                await _userManager.UpdateAsync(user);
+                await tx.CommitAsync();
 
                 await _signInManager.SignInAsync(user, isPersistent: false);
                 return RedirectToAction("Index", "Home");
             }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
 
-            foreach (var error in result.Errors)
-                ModelState.AddModelError(string.Empty, error.Description);
-
-            return View();
+        // Normalizes phone numbers (digits only) so "0918-222-1111" matches "09182221111".
+        private static bool PhonesMatch(string? storedPhone, string? enteredPhone)
+        {
+            static string DigitsOnly(string? value) => string.Concat((value ?? string.Empty).Where(char.IsDigit));
+            return !string.IsNullOrWhiteSpace(storedPhone)
+                   && !string.IsNullOrWhiteSpace(enteredPhone)
+                   && string.Equals(DigitsOnly(storedPhone), DigitsOnly(enteredPhone), StringComparison.Ordinal);
         }
 
         [HttpPost]
