@@ -59,6 +59,42 @@
     </div>
 </div>
 
+<div class="table-card mb-3">
+    <div class="p-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">SEARCH</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" value="@(ViewBag.Search)" class="form-control border-start-0" placeholder="Customer name, sale #, or invoice #..." />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">PAYMENT METHOD</label>
+                <select name="paymentMethod" class="form-select form-select-sm">
+                    <option value="">All Methods</option>
+                    <option value="Cash" selected="@(ViewBag.PaymentMethod == "Cash")">Cash</option>
+                    <option value="GCash" selected="@(ViewBag.PaymentMethod == "GCash")">GCash</option>
+                    <option value="Card" selected="@(ViewBag.PaymentMethod == "Card")">Card</option>
+                    <option value="PayMongo" selected="@(ViewBag.PaymentMethod == "PayMongo")">PayMongo</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">FROM</label>
+                <input type="date" name="from" value="@(ViewBag.From)" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1 text-muted" style="font-size: 11px; font-weight: 700;">TO</label>
+                <input type="date" name="to" value="@(ViewBag.To)" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-careplus flex-fill"><i class="bi bi-funnel me-1"></i>Apply</button>
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="table-card">
     <div class="table-card-header">
         <div>

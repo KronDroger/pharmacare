@@ -208,7 +208,7 @@
     <script>
         const ctx = document.getElementById('revenueChart');
         if (ctx) {
-            new Chart(ctx, {
+            const revenueChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: @Html.Raw(Json.Serialize(salesByMonth.Select(x => x.Month))),
@@ -232,11 +232,13 @@
                     }
                 }
             });
+            window.careplusCharts = window.careplusCharts || [];
+            window.careplusCharts.push(revenueChart);
         }
 
         const donutCtx = document.getElementById('financialDonut');
         if (donutCtx) {
-            new Chart(donutCtx, {
+            const financialDonut = new Chart(donutCtx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Sales Revenue', 'Inventory Asset Value', 'Purchasing Cost'],
@@ -254,6 +256,11 @@
                     }
                 }
             });
+            window.careplusCharts.push(financialDonut);
+        }
+
+        if (window.appChartTheme) {
+            appChartTheme(document.documentElement.getAttribute('data-theme') === 'dark');
         }
 
         function printAllFiltered() {

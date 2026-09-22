@@ -1366,3 +1366,203 @@ input.num,
 .num-negative {
   color: var(--bs-danger, #dc3545);
 }
+
+/* ==========================================================================
+   DARK MODE (app-shell scoped so login/register & printed receipts stay light)
+   Toggle button in the topbar persists `careplus_theme` in localStorage.
+   ========================================================================== */
+[data-theme="dark"] .app-shell {
+  color-scheme: dark;
+
+  /* Reserved variables (sidebar & brand keep their dark identity) */
+  --cp-forest: #0d352c;
+  --cp-forest-deep: #08261f;
+  --cp-forest-light: #12493c;
+  --cp-primary: #124d3f;
+  --cp-primary-hover: #0b392e;
+  --cp-accent: #10b981;
+  --cp-accent-hover: #34d399;
+  --cp-mint: #34d399;
+  --cp-mint-light: #6fb8a6;
+  --cp-mint-subtle: #0e231b;
+  --cp-leaf: #5c8f7f;
+
+  /* Neutrals & Surfaces */
+  --cp-bg: #0b130f;
+  --cp-surface: #101a15;
+  --cp-surface-elevated: #141f1a;
+  --cp-border: #22332b;
+  --cp-border-subtle: #1b2922;
+  --cp-text-main: #e2ece7;
+  --cp-text-muted: #9cb1a8;
+  --cp-text-light: #71877e;
+
+  /* Status backgrounds (subtle dark tints) */
+  --cp-success-bg: #12301e;
+  --cp-warning-bg: #38290f;
+  --cp-danger-bg: #3b1a1d;
+  --cp-info-bg: #0f2b3c;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Keep sidebar & brand deep-green gradient in both themes */
+[data-theme="dark"] .app-shell .sidebar {
+  background: linear-gradient(180deg, #0a2c24 0%, #051712 100%);
+}
+
+[data-theme="dark"] .app-shell .sidebar-tooltip .tooltip-inner {
+  background-color: #0a2c24;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .app-shell .sidebar-tooltip .tooltip-arrow::before {
+  border-right-color: #0a2c24 !important;
+}
+
+/* Topbar */
+[data-theme="dark"] .app-shell .page-title {
+  color: #dcebe4;
+}
+
+[data-theme="dark"] .app-shell .user-meta-name {
+  color: #e2ece7;
+}
+
+[data-theme="dark"] .app-shell .user-meta-role {
+  color: #34d399;
+}
+
+[data-theme="dark"] .app-shell .topbar-burger-btn {
+  background: #13231c;
+  color: var(--cp-mint);
+}
+
+/* Stat cards (hardcoded light backgrounds) */
+[data-theme="dark"] .app-shell .stat-card,
+[data-theme="dark"] .app-shell .stat-card-expanded {
+  background: #131e18;
+  border-color: #22332b;
+}
+
+[data-theme="dark"] .app-shell .stat-card:hover,
+[data-theme="dark"] .app-shell .stat-card-expanded:hover {
+  border-color: #3a5447;
+}
+
+[data-theme="dark"] .app-shell .stat-card .stat-label {
+  color: #93a89f;
+}
+
+[data-theme="dark"] .app-shell .stat-card .stat-value,
+[data-theme="dark"] .app-shell .stat-card-expanded .stat-value {
+  color: #e6efe9;
+}
+
+[data-theme="dark"] .app-shell .stat-card .stat-footer,
+[data-theme="dark"] .app-shell .stat-card-expanded .stat-footer {
+  border-top-color: #22332b;
+  color: #93a89f;
+}
+
+/* Category cards */
+[data-theme="dark"] .app-shell .category-card .cat-count {
+  color: #e6efe9;
+}
+
+/* Table cards */
+[data-theme="dark"] .app-shell .table-card-header {
+  background: #141f1a;
+}
+
+[data-theme="dark"] .app-shell .table-card thead th {
+  background: #111b17;
+}
+
+[data-theme="dark"] .app-shell .table-card tbody tr:hover {
+  background-color: #18241e;
+}
+
+/* POS cart panel */
+[data-theme="dark"] .app-shell .pos-cart-panel {
+  background: var(--cp-surface);
+}
+
+[data-theme="dark"] .app-shell .pos-cart-header,
+[data-theme="dark"] .app-shell .pos-cart-footer {
+  background: #111b17;
+}
+
+[data-theme="dark"] .app-shell .pos-item-card {
+  background: var(--cp-surface);
+}
+
+/* Pagination */
+[data-theme="dark"] .app-shell .pagination .page-link {
+  color: #d7e5de;
+}
+
+[data-theme="dark"] .app-shell .pagination .page-item.disabled .page-link {
+  background-color: #18241e;
+  color: #6d8379;
+}
+
+/* Custom outline button contrast */
+[data-theme="dark"] .app-shell .btn-outline-careplus {
+  color: #7fd8bd;
+  border-color: #3a8a70;
+}
+
+/* Bootstrap utilities — remap "dark text on light surfaces" so they become
+   light text on our dark surfaces. Receipts/invoices stay paper-white. */
+[data-theme="dark"] .app-shell .text-dark {
+  color: #dfe9e4 !important;
+}
+
+[data-theme="dark"] .app-shell .text-muted {
+  color: #9cb1a8 !important;
+}
+
+[data-theme="dark"] .app-shell .bg-white {
+  background-color: #101a15 !important;
+}
+
+[data-theme="dark"] .app-shell .bg-light {
+  background-color: #1b2922 !important;
+}
+
+/* Inline brand-green accent text (e.g. color: var(--cp-forest-deep)) */
+[data-theme="dark"] .app-shell [style*="var(--cp-forest-deep)"] {
+  color: #a9cabb !important;
+}
+
+[data-theme="dark"] .app-shell [style*="var(--cp-primary)"] {
+  color: #8fd4be !important;
+}
+
+/* Printable paper surfaces must stay light with dark ink */
+[data-theme="dark"] .app-shell .receipt-wrapper,
+[data-theme="dark"] .app-shell .invoice-wrapper {
+  background-color: #ffffff;
+}
+
+[data-theme="dark"] .app-shell .receipt-wrapper .text-dark,
+[data-theme="dark"] .app-shell .invoice-wrapper .text-dark {
+  color: #132a22 !important;
+}
+
+[data-theme="dark"] .app-shell .receipt-wrapper .bg-light,
+[data-theme="dark"] .app-shell .invoice-wrapper .bg-light {
+  background-color: #f1f5f3 !important;
+}
+
+[data-theme="dark"] .app-shell .receipt-wrapper .text-muted,
+[data-theme="dark"] .app-shell .invoice-wrapper .text-muted {
+  color: #647a71 !important;
+}
+
+/* Native scrollbars adapt to color-scheme automatically */

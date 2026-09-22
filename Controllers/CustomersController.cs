@@ -45,7 +45,7 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,Cashier")]
-        public async Task<IActionResult> Create([Bind("FullName,Phone,Email,Address")] Customer customer)
+        public async Task<IActionResult> Create([Bind("FullName,Phone,Email,Address,City,DateOfBirth,Gender")] Customer customer)
         {
             if (ModelState.IsValid)
             {
@@ -69,17 +69,30 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,Cashier")]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,FullName,Phone,Email,Address,DateRegistered")] Customer customer)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,FullName,Phone,Email,Address,City,DateOfBirth,Gender")] Customer customer)
         {
             if (id != customer.Id) return NotFound();
-            if (ModelState.IsValid)
-            {
-                _context.Update(customer);
-                await _context.SaveChangesAsync();
-                TempData["Success"] = "Customer updated successfully.";
-                return RedirectToAction(nameof(Index));
-            }
-            return View(customer);
+
+            if (!ModelState.IsValid) return View(customer);
+
+            // Load the persisted entity and copy only the editable contact/demographic
+            // fields. LoyaltyPoints and DateRegistered are system-managed and must
+            // never be overwritten by an edit form (previously _context.Update()
+            // silently wiped them because they were not part of the Bind list).
+            var existing = await _context.Customers.FindAsync(id);
+            if (existing == null) return NotFound();
+
+            existing.FullName = customer.FullName;
+            existing.Phone = customer.Phone;
+            existing.Email = customer.Email;
+            existing.Address = customer.Address;
+            existing.City = customer.City;
+            existing.DateOfBirth = customer.DateOfBirth;
+            existing.Gender = customer.Gender;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Customer updated successfully.";
+            return RedirectToAction(nameof(Index));
         }
 
         [Authorize(Roles = "Admin,Cashier")]

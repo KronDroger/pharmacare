@@ -42,9 +42,33 @@ namespace CarePlusPharmacy.Models
         [NotMapped]
         public int TotalStock => Batches?.Sum(b => b.Quantity) ?? 0;
 
+        // Units that are actually sellable today: non-expired batches with remaining quantity.
+        // Expired stock is quarantined for write-off and must never reach a customer.
+        [NotMapped]
+        public int SellableStock => Batches?
+            .Where(b => b.Quantity > 0 && b.ExpiryDate >= DateTime.Today)
+            .Sum(b => b.Quantity) ?? 0;
+
+        [NotMapped]
+        public int ExpiredStock => Batches?
+            .Where(b => b.Quantity > 0 && b.ExpiryDate < DateTime.Today)
+            .Sum(b => b.Quantity) ?? 0;
+
         [NotMapped]
         public DateTime? NearestExpiry => Batches != null && Batches.Any()
             ? Batches.Min(b => b.ExpiryDate)
             : null;
+
+        [NotMapped]
+        public DateTime? NearestSellableExpiry
+        {
+            get
+            {
+                var sellable = Batches?
+                    .Where(b => b.Quantity > 0 && b.ExpiryDate >= DateTime.Today)
+                    .ToList();
+                return sellable != null && sellable.Any() ? sellable.Min(b => b.ExpiryDate) : null;
+            }
+        }
     }
 }

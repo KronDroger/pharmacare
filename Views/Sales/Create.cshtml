@@ -1,7 +1,7 @@
 @{
     ViewData["Title"] = "POS Terminal";
     var customers = ViewBag.Customers as List<CarePlusPharmacy.Models.Customer> ?? new();
-    var medicines = ViewBag.Medicines as List<CarePlusPharmacy.Models.Medicine> ?? new();
+    var categories = ViewBag.Categories as List<string> ?? new();
     var rx = ViewBag.Prescription as CarePlusPharmacy.Models.Prescription;
 }
 
@@ -28,13 +28,13 @@
                     <div class="col-md-7">
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" id="medSearch" class="form-control border-start-0 ps-0" placeholder="Search by Brand name, Generic name, or Manufacturer..." oninput="filterMeds()" />
+                            <input type="text" id="medSearch" class="form-control border-start-0 ps-0" placeholder="Search by Brand name, Generic name, or Manufacturer..." oninput="onMedSearchInput()" />
                         </div>
                     </div>
                     <div class="col-md-5">
-                        <select id="catFilter" class="form-select" onchange="filterMeds()">
+                        <select id="catFilter" class="form-select" onchange="loadMeds(true)">
                             <option value="">All Categories</option>
-                            @foreach (var cat in medicines.Select(m => m.Category).Distinct().OrderBy(c => c))
+                            @foreach (var cat in categories)
                             {
                                 <option value="@cat">@cat</option>
                             }
@@ -45,72 +45,10 @@
         </div>
 
         <!-- Medicine Grid -->
-        <div class="row g-3" id="medGrid">
-            @foreach (var med in medicines)
-            {
-                var isOutOfStock = med.TotalStock <= 0;
-                var isLowStock = !isOutOfStock && med.TotalStock <= med.ReorderLevel;
-                var nearestExp = med.NearestExpiry;
-                var isNearExp = nearestExp.HasValue && nearestExp.Value <= DateTime.Today.AddDays(45);
+        <div class="row g-3" id="medGrid"></div>
 
-                <div class="col-md-6 col-xl-4 med-card-wrapper" 
-                     data-name="@med.Name.ToLower()" 
-                     data-generic="@(med.GenericName?.ToLower() ?? "")" 
-                     data-cat="@med.Category.ToLower()"
-                     data-mfr="@(med.Manufacturer?.ToLower() ?? "")">
-                    <div class="card h-100 border-0 shadow-sm p-3 d-flex flex-column justify-content-between" 
-                         style="border-radius: var(--radius-md); transition: all 0.18s; border: 1px solid var(--cp-border);">
-                        <div>
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <span class="badge bg-light text-muted border text-truncate" style="font-size: 10.5px; max-width: 140px;">
-                                    @med.Category
-                                </span>
-                                @if (isOutOfStock)
-                                {
-                                    <span class="badge bg-danger">Out of Stock</span>
-                                }
-                                else if (isLowStock)
-                                {
-                                    <span class="badge bg-warning text-dark">Low: @med.TotalStock</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Stock: @med.TotalStock</span>
-                                }
-                            </div>
-
-                            <div class="fw-bold fs-6 text-dark text-truncate" title="@med.Name">@med.Name</div>
-                            <div class="text-muted text-truncate" style="font-size: 12px;" title="@med.GenericName">
-                                <i class="bi bi-capsule me-1"></i>@(string.IsNullOrEmpty(med.GenericName) ? "Standard Formula" : med.GenericName)
-                            </div>
-                            @if (!string.IsNullOrEmpty(med.Manufacturer))
-                            {
-                                <div class="text-muted" style="font-size: 11px;">
-                                    <i class="bi bi-building me-1"></i>@med.Manufacturer
-                                </div>
-                            }
-
-                            @if (nearestExp.HasValue)
-                            {
-                                <div class="mt-1" style="font-size: 11px;">
-                                    Exp: <span class="@(isNearExp ? "text-danger fw-bold" : "text-muted")">@nearestExp.Value.ToString("MMM yyyy")</span>
-                                </div>
-                            }
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-                            <span class="fw-bold fs-5 text-success">₱@med.UnitPrice.ToString("N2")</span>
-                            <button type="button" 
-                                    class="btn btn-sm @(isOutOfStock ? "btn-secondary" : "btn-careplus") px-3" 
-                                    @(isOutOfStock ? "disabled" : "")
-                                    onclick="addToCart(@med.Id, '@med.Name.Replace("'", "\\'")', @med.UnitPrice, @med.TotalStock)">
-                                <i class="bi bi-plus-lg me-1"></i> Add
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
+        <!-- Grid Pager -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-3" id="medPager"></div>
     </div>
 
     <!-- Right Column: Active Cart & Checkout Panel -->
@@ -237,22 +175,135 @@
         }
     }
 
-    function filterMeds() {
-        const query = document.getElementById('medSearch').value.toLowerCase().trim();
-        const cat = document.getElementById('catFilter').value.toLowerCase().trim();
-        const cards = document.querySelectorAll('.med-card-wrapper');
+    function filterMeds() { loadMeds(true); }
 
-        cards.forEach(card => {
-            const name = card.dataset.name || '';
-            const generic = card.dataset.generic || '';
-            const cardCat = card.dataset.cat || '';
-            const mfr = card.dataset.mfr || '';
+    let medPage = 1;
+    const medPageSize = 12;
+    let medTotalPages = 1;
+    let medTotalCount = 0;
+    let medSearchTimer = null;
 
-            const matchesQuery = !query || name.includes(query) || generic.includes(query) || mfr.includes(query);
-            const matchesCat = !cat || cardCat === cat;
+    function onMedSearchInput() {
+        clearTimeout(medSearchTimer);
+        medSearchTimer = setTimeout(() => loadMeds(true), 300);
+    }
 
-            card.style.display = (matchesQuery && matchesCat) ? 'block' : 'none';
+    function loadMeds(resetPage = false) {
+        if (resetPage) medPage = 1;
+
+        const query = document.getElementById('medSearch')?.value.trim() || '';
+        const cat = document.getElementById('catFilter')?.value || '';
+        const grid = document.getElementById('medGrid');
+        const pager = document.getElementById('medPager');
+
+        if (grid) {
+            grid.innerHTML = '<div class="col-12 text-center text-muted py-5"><div class="spinner-border spinner-border-sm text-success me-2"></div>Loading medicines...</div>';
+        }
+
+        const url = '@Url.Action("Medicines", "Sales")'
+            + `?page=${medPage}&pageSize=${medPageSize}`
+            + `&search=${encodeURIComponent(query)}`
+            + `&category=${encodeURIComponent(cat)}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(d => {
+                medTotalPages = d.totalPages;
+                medTotalCount = d.totalCount;
+                renderMedicineCards(d.data || []);
+                renderMedPager();
+            })
+            .catch(() => {
+                if (grid) grid.innerHTML = '<div class="col-12 text-center text-danger py-5">Failed to load medicines. Please try again.</div>';
+            });
+    }
+
+    function renderMedicineCards(list) {
+        const grid = document.getElementById('medGrid');
+        if (!grid) return;
+
+        if (!list.length) {
+            grid.innerHTML = '<div class="col-12 text-center text-muted py-5">' +
+                '<i class="bi bi-search fs-2 d-block mb-2 text-muted"></i>' +
+                'No medicines match your search.</div>';
+            return;
+        }
+
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const todayPlus45 = Date.now() + (45 * 24 * 60 * 60 * 1000);
+
+        let html = '';
+        list.forEach(med => {
+            const sellableStock = Number(med.sellableStock) || 0;
+            const isOutOfStock = sellableStock <= 0;
+            const isLowStock = !isOutOfStock && sellableStock <= med.reorderLevel;
+            const nearExp = med.nearestExpiry ? new Date(med.nearestExpiry + 'T00:00:00') : null;
+            const isNearExp = nearExp && nearExp.getTime() <= todayPlus45;
+
+            let stockBadge;
+            if (isOutOfStock) stockBadge = '<span class="badge bg-danger">Out of Stock</span>';
+            else if (isLowStock) stockBadge = '<span class="badge bg-warning text-dark">Low: ' + sellableStock + '</span>';
+            else stockBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle">Stock: ' + sellableStock + '</span>';
+
+            const expiredUnits = Number(med.expiredStock) || 0;
+            const expiredNote = expiredUnits > 0
+                ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" title="' + expiredUnits + ' expired units are not sellable">' + expiredUnits + ' exp.</span>'
+                : '';
+
+            let genericLine = med.genericName || 'Standard Formula';
+            let mfrLine = med.manufacturer ? '<div class="text-muted" style="font-size: 11px;"><i class="bi bi-building me-1"></i>' + med.manufacturer + '</div>' : '';
+            let expLine = nearExp
+                ? '<div class="mt-1" style="font-size: 11px;">Exp: <span class="' + (isNearExp ? 'text-danger fw-bold' : 'text-muted') + '">' + months[nearExp.getMonth()] + ' ' + nearExp.getFullYear() + '</span></div>'
+                : '';
+
+            const safeName = String(med.name).replace(/'/g, "\\'");
+            const price = Number(med.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            html += '<div class="col-md-6 col-xl-4">' +
+                '<div class="card h-100 border-0 shadow-sm p-3 d-flex flex-column justify-content-between" style="border-radius: var(--radius-md); transition: all 0.18s; border: 1px solid var(--cp-border);">' +
+                '<div>' +
+                '<div class="d-flex justify-content-between align-items-start mb-1">' +
+                '<span class="badge bg-light text-muted border text-truncate" style="font-size: 10.5px; max-width: 140px;">' + med.category + '</span>' +
+                '<span class="d-inline-flex align-items-center gap-1">' + stockBadge + expiredNote + '</span>' +
+                '</div>' +
+                '<div class="fw-bold fs-6 text-dark text-truncate" title="' + med.name + '">' + med.name + '</div>' +
+                '<div class="text-muted text-truncate" style="font-size: 12px;" title="' + genericLine + '"><i class="bi bi-capsule me-1"></i>' + genericLine + '</div>' +
+                mfrLine +
+                expLine +
+                '</div>' +
+                '<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">' +
+                '<span class="fw-bold fs-5 text-success">₱' + price + '</span>' +
+                '<button type="button" class="btn btn-sm ' + (isOutOfStock ? 'btn-secondary' : 'btn-careplus') + ' px-3" ' + (isOutOfStock ? 'disabled' : '') +
+                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ')">' +
+                '<i class="bi bi-plus-lg me-1"></i> Add</button>' +
+                '</div>' +
+                '</div>' +
+                '</div>';
         });
+
+        grid.innerHTML = html;
+    }
+
+    function goMedPage(newPage) {
+        if (newPage < 1 || newPage > medTotalPages) return;
+        medPage = newPage;
+        loadMeds(false);
+    }
+
+    function renderMedPager() {
+        const pager = document.getElementById('medPager');
+        if (!pager) return;
+
+        const start = medTotalCount === 0 ? 0 : ((medPage - 1) * medPageSize) + 1;
+        const end = Math.min(medPage * medPageSize, medTotalCount);
+
+        pager.innerHTML =
+            '<div class="text-muted" style="font-size: 12.5px;">Showing ' + start + '&ndash;' + end + ' of ' + medTotalCount + ' medicines</div>' +
+            '<div class="d-flex gap-1 align-items-center">' +
+            '<button type="button" class="btn btn-sm btn-outline-careplus py-1 px-3" onclick="goMedPage(' + (medPage - 1) + ')" ' + (medPage <= 1 ? 'disabled' : '') + '><i class="bi bi-chevron-left"></i></button>' +
+            '<span class="fw-semibold px-2" style="font-size: 13px;">Page ' + medPage + ' / ' + medTotalPages + '</span>' +
+            '<button type="button" class="btn btn-sm btn-outline-careplus py-1 px-3" onclick="goMedPage(' + (medPage + 1) + ')" ' + (medPage >= medTotalPages ? 'disabled' : '') + '><i class="bi bi-chevron-right"></i></button>' +
+            '</div>';
     }
 
     function addToCart(medId, medName, price, maxStock, initialQty = 1) {
@@ -475,6 +526,7 @@
     // Call onCustomerChange once on load to configure pre-selected customer
     document.addEventListener('DOMContentLoaded', () => {
         onCustomerChange();
+        loadMeds();
     });
 </script>
 }

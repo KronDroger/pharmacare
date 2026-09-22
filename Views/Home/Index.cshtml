@@ -173,7 +173,7 @@
     <script>
         const topMedsCtx = document.getElementById('topMedsChart');
         if (topMedsCtx) {
-            new Chart(topMedsCtx, {
+            const topMedsChart = new Chart(topMedsCtx, {
                 type: 'bar',
                 data: {
                     labels: @Html.Raw(Json.Serialize(Model.TopSellingMedicines.Select(t => t.MedicineName))),
@@ -210,6 +210,8 @@
                     }
                 }
             });
+            window.careplusCharts = window.careplusCharts || [];
+            window.careplusCharts.push(topMedsChart);
         }
 
         const catCtx = document.getElementById('categoryChart');
@@ -226,7 +228,7 @@
                 return colors;
             }
 
-            new Chart(catCtx, {
+            const catChart = new Chart(catCtx, {
                 type: 'doughnut',
                 data: {
                     labels: catLabels,
@@ -263,6 +265,11 @@
                     }
                 }
             });
+            window.careplusCharts.push(catChart);
+        }
+
+        if (window.appChartTheme) {
+            appChartTheme(document.documentElement.getAttribute('data-theme') === 'dark');
         }
     </script>
 }
