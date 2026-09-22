@@ -69,6 +69,15 @@
                 </button>
             </div>
 
+            @{
+                // Each sidebar section header renders only when at least one of its
+                // links is visible to the current user's role.
+                var showCoreOps = User.IsInRole("Admin") || User.IsInRole("Cashier") || User.IsInRole("Pharmacist");
+                var showInventory = User.IsInRole("Admin") || User.IsInRole("InventoryCoordinator") || User.IsInRole("Pharmacist");
+                var showCrm = User.IsInRole("Admin") || User.IsInRole("Cashier") || User.IsInRole("Pharmacist");
+                var showCompliance = User.IsInRole("Admin") || User.IsInRole("Pharmacist");
+            }
+
             <nav class="nav flex-column">
                 @if (!User.IsInRole("Customer"))
                 {
@@ -81,7 +90,7 @@
                 </a>
 
                 <!-- SECTION: OPERATIONS -->
-                @if (User.IsInRole("Admin") || User.IsInRole("Cashier") || User.IsInRole("Pharmacist"))
+                @if (showCoreOps)
                 {
                     <div class="sidebar-section-title">Core Operations</div>
 
@@ -105,7 +114,7 @@
                 }
 
                 <!-- SECTION: INVENTORY & ERP -->
-                @if (User.IsInRole("Admin") || User.IsInRole("InventoryCoordinator") || User.IsInRole("Pharmacist"))
+                @if (showInventory)
                 {
                     <div class="sidebar-section-title">Inventory &amp; ERP</div>
 
@@ -190,7 +199,7 @@
                 }
 
                 <!-- SECTION: CRM & HEALTHCARE -->
-                @if (!User.IsInRole("InventoryCoordinator"))
+                @if (showCrm)
                 {
                     <div class="sidebar-section-title">CRM &amp; Patients</div>
 
@@ -218,7 +227,7 @@
                 }
 
                 <!-- SECTION: ADMINISTRATION -->
-                @if (User.IsInRole("Admin") || User.IsInRole("Pharmacist"))
+                @if (showCompliance)
                 {
                     <div class="sidebar-section-title">Compliance &amp; Admin</div>
 
