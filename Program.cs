@@ -38,7 +38,6 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddScoped<ICurrentCustomerService, CurrentCustomerService>();
 builder.Services.AddSingleton<CarePlusPharmacy.Services.PricingService>();
-builder.Services.AddHttpClient<CarePlusPharmacy.Services.RecaptchaService>();
 builder.Services.AddControllersWithViews()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 

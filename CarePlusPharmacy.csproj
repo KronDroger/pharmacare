@@ -1,11 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CarePlusPharmacy</RootNamespace>
-    <UserSecretsId>423c0b25-526d-4117-a318-057c8244460a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

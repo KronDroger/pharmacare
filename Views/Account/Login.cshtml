@@ -1,5 +1,4 @@
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env
-@inject Microsoft.Extensions.Configuration.IConfiguration _config
 @{
     ViewData["Title"] = "Sign In";
 }
@@ -40,14 +39,6 @@
                 <label class="form-check-label" for="rememberMe" style="font-size:13px;">Remember me</label>
             </div>
         </div>
-
-        @if (!_env.IsDevelopment())
-        {
-            <div class="mb-3">
-                <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-                <div class="g-recaptcha" data-sitekey="@_config["Recaptcha:SiteKey"]"></div>
-            </div>
-        }
 
         <button type="submit" id="submitBtn" class="btn btn-careplus w-100 py-2 fs-6">Sign In to Workspace</button>
     </form>
