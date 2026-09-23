@@ -17,12 +17,15 @@ namespace CarePlusPharmacy.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ICurrentCustomerService _currentCustomerService;
 
-        public PortalController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ICurrentCustomerService currentCustomerService)
+        public PortalController(ApplicationDbContext context, UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager, ICurrentCustomerService currentCustomerService)
         {
             _context = context;
             _userManager = userManager;
+            _signInManager = signInManager;
             _currentCustomerService = currentCustomerService;
         }
 
@@ -99,6 +102,38 @@ namespace CarePlusPharmacy.Controllers
             }
 
             return View(customer);
+        }
+
+        // ---------- SECURITY (change password) ----------
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword, string confirmPassword)
+        {
+            if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            {
+                TempData["SecurityError"] = "Please fill in both your current and new password.";
+                return RedirectToAction(nameof(Profile));
+            }
+            if (newPassword != confirmPassword)
+            {
+                TempData["SecurityError"] = "New password and confirmation do not match.";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction(nameof(Profile));
+
+            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            if (!result.Succeeded)
+            {
+                TempData["SecurityError"] = string.Join(" ", result.Errors.Select(e => e.Description));
+                return RedirectToAction(nameof(Profile));
+            }
+
+            await _signInManager.RefreshSignInAsync(user);
+            TempData["SecuritySuccess"] = "Your password has been changed.";
+            return RedirectToAction(nameof(Profile));
         }
 
         // ---------- PURCHASES ----------

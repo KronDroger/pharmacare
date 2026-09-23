@@ -13,6 +13,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+// Self-hosted math CAPTCHA (no external service/API key) - singleton because it is stateless.
+builder.Services.AddSingleton<ISimpleCaptchaService, SimpleCaptchaService>();
+
 // ---- Identity + RBAC (Roles) + Login Security ----
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {

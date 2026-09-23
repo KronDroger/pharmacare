@@ -136,6 +136,16 @@
             </div>
         </div>
 
+        <div class="mb-3 p-3 rounded" style="background: var(--cp-mint-subtle, #f4faf6); border: 1px solid var(--cp-border);">
+            <label class="form-label mb-1 fw-semibold" style="font-size: 12.5px;">
+                <i class="bi bi-shield-check me-1 text-success"></i>Quick check - are you human?
+            </label>
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold" style="font-size: 14px; min-width: max-content;">@ViewBag.CaptchaQuestion</span>
+                <input type="hidden" name="captchaToken" value="@ViewBag.CaptchaToken" />
+                <input type="number" name="captchaAnswer" class="form-control form-control-sm" style="max-width: 90px;" placeholder="?" required autocomplete="off" />
+            </div>
+        </div>
         <button type="submit" class="btn btn-careplus w-100 py-2 fs-6">Enroll &amp; Create Account</button>
     </form>
 

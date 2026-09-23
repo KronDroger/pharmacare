@@ -14,11 +14,18 @@
 }
 
 <div class="row g-4">
+    <!-- Left: identity card -->
     <div class="col-lg-4">
         <div class="table-card h-100">
             <div class="p-4 text-center">
-                <div class="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle" style="width: 72px; height: 72px; background-color: var(--cp-mint-subtle); color: var(--cp-forest-deep); font-size: 26px; font-weight: 700;">
+                <div class="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle position-relative"
+                     style="width: 84px; height: 84px; background-color: var(--cp-mint-subtle); color: var(--cp-forest-deep); font-size: 30px; font-weight: 700;">
                     @Model.FullName.Substring(0, 1).ToUpper()
+                    <span class="position-absolute d-flex align-items-center justify-content-center rounded-circle"
+                          style="width: 22px; height: 22px; bottom: -2px; right: -2px; background: var(--cp-success, #10b981); color: #fff; font-size: 12px; border: 2px solid var(--cp-surface-elevated, #fff);"
+                          title="Verified account">
+                        <i class="bi bi-check-lg"></i>
+                    </span>
                 </div>
                 <div class="fw-bold fs-5">@Model.FullName</div>
                 <div class="text-muted" style="font-size: 13px;">@Model.Email</div>
@@ -36,65 +43,156 @@
                         <div class="text-muted" style="font-size: 11px;">Patient Since</div>
                     </div>
                 </div>
+                <hr />
+                <a asp-action="Rewards" class="btn btn-careplus w-100 mb-2"><i class="bi bi-gift me-1"></i>View Points &amp; Rewards</a>
             </div>
         </div>
     </div>
 
+    <!-- Right: tabbed details -->
     <div class="col-lg-8">
         <div class="table-card">
             <div class="table-card-header">
                 <div>
-                    <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-pencil-square text-success me-2"></i>Edit Profile</div>
+                    <div class="fw-bold fs-6" style="color: var(--cp-heading, var(--cp-forest-deep));"><i class="bi bi-person-vcard text-success me-2"></i>Profile &amp; Account Details</div>
                     <div class="text-muted" style="font-size: 12px;">Keep your contact details current so the pharmacy can reach you</div>
                 </div>
             </div>
 
-            <form asp-action="Profile" method="post" class="p-4">
-                @Html.AntiForgeryToken()
-                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            @if (TempData["SecuritySuccess"] != null)
+            {
+                <div class="alert alert-success m-3 mb-0 py-2" style="font-size: 13px;">@TempData["SecuritySuccess"]</div>
+            }
+            @if (TempData["SecurityError"] != null)
+            {
+                <div class="alert alert-danger m-3 mb-0 py-2" style="font-size: 13px;">@TempData["SecurityError"]</div>
+            }
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Email <span class="text-muted fst-italic">(read-only)</span></label>
-                        <input type="email" class="form-control" value="@Model.Email" disabled />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="FullName" class="form-label"></label>
-                        <input asp-for="FullName" class="form-control" />
-                        <span asp-validation-for="FullName" class="text-danger"></span>
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="Phone" class="form-label"></label>
-                        <input asp-for="Phone" class="form-control" />
-                        <span asp-validation-for="Phone" class="text-danger"></span>
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="Address" class="form-label"></label>
-                        <input asp-for="Address" class="form-control" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="City" class="form-label"></label>
-                        <input asp-for="City" class="form-control" />
-                    </div>
-                    <div class="col-md-3">
-                        <label asp-for="DateOfBirth" class="form-label"></label>
-                        <input asp-for="DateOfBirth" type="date" class="form-control" />
-                    </div>
-                    <div class="col-md-3">
-                        <label asp-for="Gender" class="form-label"></label>
-                        <select asp-for="Gender" class="form-select">
-                            <option value="">Not specified</option>
-                            <option>Male</option>
-                            <option>Female</option>
-                        </select>
+            <!-- Tab nav -->
+            <ul class="nav nav-tabs px-3 pt-3" role="tablist" style="border-bottom: 1px solid var(--cp-border);">
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabContact" type="button">
+                        <i class="bi bi-person-lines-fill me-1"></i>Contact
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFamily" type="button">
+                        <i class="bi bi-people me-1"></i>Family Members
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPreferences" type="button">
+                        <i class="bi bi-sliders me-1"></i>Preferences
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSecurity" type="button">
+                        <i class="bi bi-shield-lock me-1"></i>Security
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- CONTACT -->
+                <div class="tab-pane fade show active p-4" id="tabContact">
+                    <form asp-action="Profile" method="post">
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Email <span class="text-muted fst-italic">(read-only)</span></label>
+                                <input type="email" class="form-control" value="@Model.Email" disabled />
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="FullName" class="form-label"></label>
+                                <input asp-for="FullName" class="form-control" />
+                                <span asp-validation-for="FullName" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Phone" class="form-label"></label>
+                                <div class="input-group">
+                                    <input asp-for="Phone" class="form-control" />
+                                    <span class="input-group-text text-muted" style="font-size: 11.5px;" title="Phone verification is not available yet">
+                                        <i class="bi bi-dash-circle me-1"></i>Unverified
+                                    </span>
+                                </div>
+                                <span asp-validation-for="Phone" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Address" class="form-label"></label>
+                                <input asp-for="Address" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="City" class="form-label"></label>
+                                <input asp-for="City" class="form-control" />
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="DateOfBirth" class="form-label"></label>
+                                <input asp-for="DateOfBirth" type="date" class="form-control" />
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Gender" class="form-label"></label>
+                                <select asp-for="Gender" class="form-select">
+                                    <option value="">Not specified</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-careplus"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- FAMILY MEMBERS (placeholder - no linked-dependents feature yet) -->
+                <div class="tab-pane fade p-4" id="tabFamily">
+                    <div class="text-center py-4">
+                        <i class="bi bi-people fs-1 text-muted d-block mb-2"></i>
+                        <div class="fw-semibold">Family accounts aren't set up yet</div>
+                        <div class="text-muted mt-1" style="font-size: 13px; max-width: 420px; margin: 0 auto;">
+                            Linking a spouse, child, or dependent's patient record to your account is planned for a future update.
+                            For now, ask the pharmacy to set up a separate linked account for each family member.
+                        </div>
                     </div>
                 </div>
 
-                <div class="mt-4">
-                    <button type="submit" class="btn btn-careplus"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
-                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                <!-- PREFERENCES (placeholder - no notification-settings feature yet) -->
+                <div class="tab-pane fade p-4" id="tabPreferences">
+                    <div class="text-center py-4">
+                        <i class="bi bi-bell fs-1 text-muted d-block mb-2"></i>
+                        <div class="fw-semibold">Notification preferences aren't available yet</div>
+                        <div class="text-muted mt-1" style="font-size: 13px; max-width: 420px; margin: 0 auto;">
+                            SMS/email refill reminders and promo notices will appear here in a future update.
+                        </div>
+                    </div>
                 </div>
-            </form>
+
+                <!-- SECURITY -->
+                <div class="tab-pane fade p-4" id="tabSecurity">
+                    <div class="fw-semibold mb-2"><i class="bi bi-key me-1 text-success"></i>Change Password</div>
+                    <form asp-action="ChangePassword" method="post" style="max-width: 420px;">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" name="currentPassword" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">New Password</label>
+                            <input type="password" name="newPassword" class="form-control" minlength="8" required />
+                            <div class="form-text">At least 8 characters.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" name="confirmPassword" class="form-control" minlength="8" required />
+                        </div>
+                        <button type="submit" class="btn btn-careplus"><i class="bi bi-shield-check me-1"></i>Update Password</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>

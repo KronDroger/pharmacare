@@ -1,4 +1,5 @@
 using CarePlusPharmacy.Data;
+using CarePlusPharmacy.Services;
 using CarePlusPharmacy.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -12,33 +13,57 @@ namespace CarePlusPharmacy.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
+        private readonly ISimpleCaptchaService _captcha;
 
         public AccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            ISimpleCaptchaService captcha)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _context = context;
+            _captcha = captcha;
         }
+
+        // A fresh question is generated per GET and handed to the view as (question text, signed token).
+        // The token round-trips as a hidden field and is verified server-side on POST - the answer
+        // is never trusted from the client alone.
+        private (string Question, string Token) NewCaptcha() => _captcha.Generate();
 
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
+            var (q, tok) = NewCaptcha();
+            ViewBag.CaptchaQuestion = q;
+            ViewBag.CaptchaToken = tok;
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(string email, string password, bool rememberMe = false, string? returnUrl = null)
+        public async Task<IActionResult> Login(string email, string password, bool rememberMe = false, string? returnUrl = null,
+            string? captchaToken = null, string? captchaAnswer = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
+
+            if (!_captcha.Verify(captchaToken, captchaAnswer))
+            {
+                ModelState.AddModelError(string.Empty, "Incorrect answer to the verification question. Please try again.");
+                var (q, tok) = NewCaptcha();
+                ViewBag.CaptchaQuestion = q;
+                ViewBag.CaptchaToken = tok;
+                return View();
+            }
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
                 ModelState.AddModelError(string.Empty, "Email and password are required.");
+                var (q4, tok4) = NewCaptcha();
+                ViewBag.CaptchaQuestion = q4;
+                ViewBag.CaptchaToken = tok4;
                 return View();
             }
 
@@ -47,6 +72,9 @@ namespace CarePlusPharmacy.Controllers
             {
                 ModelState.AddModelError(string.Empty,
                     "Too many failed sign-in attempts. This account is locked for 15 minutes. Contact an administrator if you believe this is a mistake.");
+                var (q5, tok5) = NewCaptcha();
+                ViewBag.CaptchaQuestion = q5;
+                ViewBag.CaptchaToken = tok5;
                 return View();
             }
 
@@ -68,12 +96,18 @@ namespace CarePlusPharmacy.Controllers
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             }
 
+            var (q6, tok6) = NewCaptcha();
+            ViewBag.CaptchaQuestion = q6;
+            ViewBag.CaptchaToken = tok6;
             return View();
         }
 
         [HttpGet]
         public IActionResult Register()
         {
+            var (q, tok) = NewCaptcha();
+            ViewBag.CaptchaQuestion = q;
+            ViewBag.CaptchaToken = tok;
             return View();
         }
 
@@ -82,12 +116,25 @@ namespace CarePlusPharmacy.Controllers
         public async Task<IActionResult> Register(
             string fullName, string email, string password,
             string phone, string? address, string? city,
-            DateTime? dateOfBirth, string? gender)
+            DateTime? dateOfBirth, string? gender,
+            string? captchaToken = null, string? captchaAnswer = null)
         {
+            if (!_captcha.Verify(captchaToken, captchaAnswer))
+            {
+                ModelState.AddModelError(string.Empty, "Incorrect answer to the verification question. Please try again.");
+                var (q0, tok0) = NewCaptcha();
+                ViewBag.CaptchaQuestion = q0;
+                ViewBag.CaptchaToken = tok0;
+                return View();
+            }
+
             if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email)
                 || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(phone))
             {
                 ModelState.AddModelError(string.Empty, "Full name, email, phone, and password are required.");
+                var (q1, tok1) = NewCaptcha();
+                ViewBag.CaptchaQuestion = q1;
+                ViewBag.CaptchaToken = tok1;
                 return View();
             }
 
@@ -110,6 +157,9 @@ namespace CarePlusPharmacy.Controllers
                     await tx.RollbackAsync();
                     foreach (var error in result.Errors)
                         ModelState.AddModelError(string.Empty, error.Description);
+                    var (q3, tok3) = NewCaptcha();
+                    ViewBag.CaptchaQuestion = q3;
+                    ViewBag.CaptchaToken = tok3;
                     return View();
                 }
 
@@ -125,6 +175,9 @@ namespace CarePlusPharmacy.Controllers
                         await tx.RollbackAsync();
                         ModelState.AddModelError(string.Empty,
                             "A patient profile already exists for this email. Contact the pharmacy with your valid ID so staff can link your account.");
+                        var (q2, tok2) = NewCaptcha();
+                        ViewBag.CaptchaQuestion = q2;
+                        ViewBag.CaptchaToken = tok2;
                         return View();
                     }
 
