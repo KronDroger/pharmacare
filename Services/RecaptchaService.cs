@@ -35,10 +35,15 @@ namespace CarePlusPharmacy.Services
             }
 
             // The secret is loaded from configuration and must be provided by the
-            // operator. Note: `dotnet user-secrets` is only wired up in Development,
-            // so in Production the value must come from the environment variable
-            // Recaptcha__SecretKey (or the platform's secret store).
+            // operator. `dotnet user-secrets` is only wired up in Development, so
+            // in Production the value must come from the environment variable
+            // Recaptcha__SecretKey (or the platform's secret store). Fall back to
+            // that environment variable directly when configuration is empty.
             var secret = _config["Recaptcha:SecretKey"];
+            if (string.IsNullOrWhiteSpace(secret))
+            {
+                secret = Environment.GetEnvironmentVariable("Recaptcha__SecretKey");
+            }
             if (string.IsNullOrWhiteSpace(secret))
             {
                 _logger.LogWarning(

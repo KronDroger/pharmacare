@@ -125,3 +125,16 @@
 - [x] Demo account seeds (`CreateUserIfNotExists` x5) gated to `IHostEnvironment.IsDevelopment()`; "Quick Demo Logins" autofill chips only render in Development
 - [x] Removed the fake tile-CAPTCHA ("Select all images") markup/JS and the `/Account/ConfirmCaptcha` endpoint + `RecaptchaService`/`IRecaptchaService` (server verification no longer expected)
 - [x] Verified e2e: login page clean of captcha, ConfirmCaptcha 404s, normal login works, 5 failed attempts lock the account (correct password then rejected with the lock message), other accounts unaffected
+
+## Phase 17: Real Google reCAPTCHA v2 (commits `48af267`, `458ca7c`)
+- [x] Added Google reCAPTCHA v2 widget to Login and Register — **Production only** (skipped entirely in Development so local demos/tests are not blocked)
+- [x] `RecaptchaService` posts the token to `https://www.google.com/recaptcha/api/siteverify` with the configured secret and returns only when `success` is `true`; bot tokens, HTTP errors, and missing secret all fail closed
+- [x] Server-side verification wired into `AccountController.Login` and `AccountController.Register` before any credential/account work
+- [x] Root cause of "always failing": the secret was never configured anywhere, so verification always returned false. Fixed by reading `Recaptcha:SecretKey` and falling back to the `Recaptcha__SecretKey` environment variable
+- [x] Verified e2e in Production locally: without the env var login is blocked with "Please complete the reCAPTCHA"; after `$env:Recaptcha__SecretKey` is set and the box is ticked, login succeeds
+
+> **DEPLOYMENT REQUIREMENT (Production):** reCAPTCHA verification fail-closes unless the secret is present. It
+> **must** be set as the `Recaptcha__SecretKey` environment variable on the Production host (or the platform's
+> secret store bound to that key). `dotnet user-secrets` is Development-only and does NOT apply in Production.
+> The client-side `Recaptcha:SiteKey` lives in `appsettings.json` (public by design — fine to commit); the
+> secret must never be committed.
