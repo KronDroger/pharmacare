@@ -1,3 +1,5 @@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env
+@inject Microsoft.Extensions.Configuration.IConfiguration _config
 @{
     ViewData["Title"] = "Patient Registration";
 }
@@ -135,6 +137,14 @@
                 <i class="bi bi-check-circle-fill me-1"></i> Strong password filled and copied to clipboard!
             </div>
         </div>
+
+        @if (!_env.IsDevelopment())
+        {
+            <div class="mb-3">
+                <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+                <div class="g-recaptcha" data-sitekey="@_config["Recaptcha:SiteKey"]"></div>
+            </div>
+        }
 
         <button type="submit" class="btn btn-careplus w-100 py-2 fs-6">Enroll &amp; Create Account</button>
     </form>

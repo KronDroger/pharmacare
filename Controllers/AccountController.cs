@@ -1,5 +1,6 @@
 using CarePlusPharmacy.Data;
 using CarePlusPharmacy.Models;
+using CarePlusPharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -12,15 +13,18 @@ namespace CarePlusPharmacy.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
+        private readonly RecaptchaService _recaptcha;
 
         public AccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            RecaptchaService recaptcha)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _context = context;
+            _recaptcha = recaptcha;
         }
 
         [HttpGet]
@@ -35,6 +39,13 @@ namespace CarePlusPharmacy.Controllers
         public async Task<IActionResult> Login(string email, string password, bool rememberMe = false, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
+
+            // Google reCAPTCHA v2 — verified server-side before any credential work.
+            if (!await _recaptcha.VerifyAsync(Request.Form["g-recaptcha-response"]))
+            {
+                ModelState.AddModelError(string.Empty, "Please complete the reCAPTCHA to continue.");
+                return View();
+            }
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
@@ -84,6 +95,13 @@ namespace CarePlusPharmacy.Controllers
             string phone, string? address, string? city,
             DateTime? dateOfBirth, string? gender)
         {
+            // Google reCAPTCHA v2 — verified server-side before any account work.
+            if (!await _recaptcha.VerifyAsync(Request.Form["g-recaptcha-response"]))
+            {
+                ModelState.AddModelError(string.Empty, "Please complete the reCAPTCHA to continue.");
+                return View();
+            }
+
             if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email)
                 || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(phone))
             {
