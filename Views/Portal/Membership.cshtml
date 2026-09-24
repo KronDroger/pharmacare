@@ -11,6 +11,8 @@
 
 @{
     var cur = Model.CurrentMembership;
+    var freeTier = Model.Tiers.FirstOrDefault(t => t.MonthlyPrice == 0);
+    var currentTierId = cur?.MembershipTierId ?? freeTier?.Id;
     string PerksRow(CarePlusPharmacy.Models.MembershipTier t)
     {
         var s = "";
@@ -75,10 +77,13 @@
     }
     @foreach (var t in Model.Tiers)
     {
+        var isCurrent = t.Id == currentTierId;
+        var isCurrentFree = isCurrent && cur == null && freeTier != null && t.Id == freeTier.Id;
+        var cardStyle = "border:1px solid #dee2e6;" + (isCurrentFree ? " opacity:.6;" : "");
         <div class="col-md-4">
-            <div class="border rounded table-card h-100 d-flex flex-column" style="border: 1px solid #dee2e6;">
+            <div class="border rounded table-card h-100 d-flex flex-column" style="@cardStyle">
                 <div class="p-3 pb-2">
-                    <div class="fw-bold" style="color: var(--cp-forest-deep);">@t.Name</div>
+                    <div class="fw-bold" style="color: var(--cp-forest-deep);">@t.Name @if (isCurrentFree) { <span class="badge bg-secondary ms-1">Free</span> }</div>
                     <div class="fs-4 fw-bold text-success mt-1">₱@t.MonthlyPrice.ToString("N2") <span class="fs-6 text-muted fw-normal">/ month</span></div>
                     <div class="text-muted" style="font-size: 12.5px;">@t.DiscountPercent.ToString("0.##")% off on every purchase</div>
                 </div>
@@ -92,9 +97,11 @@
                     </ul>
                 </div>
                 <div class="p-3 pt-2 mt-auto">
-                    @if (cur != null && cur.MembershipTierId == t.Id)
+                    @if (isCurrent)
                     {
-                        <button type="button" class="btn btn-outline-success w-100" disabled><i class="bi bi-check-lg"></i> Current Plan</button>
+                        <button type="button" class="btn w-100 @(isCurrentFree ? "btn-outline-secondary" : "btn-outline-success")" disabled>
+                            <i class="bi @(isCurrentFree ? "bi-star" : "bi-check-lg")"></i> @(isCurrentFree ? "Current Plan — Free" : "Current Plan")
+                        </button>
                     }
                     else
                     {
