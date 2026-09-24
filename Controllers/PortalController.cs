@@ -412,6 +412,12 @@ namespace CarePlusPharmacy.Controllers
             var current = await _context.CustomerMemberships
                 .FirstOrDefaultAsync(m => m.CustomerId == customer.Id && m.Status == MembershipStatus.Active);
 
+            if (tier.MonthlyPrice == 0 && current == null)
+            {
+                TempData["Error"] = "You're already on the free plan — pick a paid tier to enjoy member benefits.";
+                return RedirectToAction(nameof(Membership));
+            }
+
             var switched = false;
             if (current != null)
             {
