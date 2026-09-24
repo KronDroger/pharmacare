@@ -213,6 +213,7 @@ namespace CarePlusPharmacy.Data
             await EnsureRichDataSeededAsync(context, userManager);
             await EnsureVatExemptMedicinesAsync(context);
             await EnsureRxRequiredMedicinesAsync(context);
+            await EnsurePurchaseOrderDataAsync(context);
 
             // ---- 5. Link demo accounts to their Customer records ----
             // The portal resolves patients via ApplicationUser.CustomerId, so the demo
@@ -293,6 +294,71 @@ namespace CarePlusPharmacy.Data
                 .ToList();
             foreach (var med in rxMeds) { med.RxRequired = true; }
             if (rxMeds.Any()) { await context.SaveChangesAsync(); }
+        }
+
+        // Seed purchase orders on databases that have none (existing DBs skip the
+        // initial `Suppliers.Any()` bootstrap block, so they never received POs) —
+        // gives the PurchaseOrders page rows so its filters can be demonstrated.
+        private static async Task EnsurePurchaseOrderDataAsync(ApplicationDbContext context)
+        {
+            if (await context.PurchaseOrders.AnyAsync()) return;
+
+            var suppliers = await context.Suppliers.ToListAsync();
+            if (suppliers.Count == 0) return;
+            Supplier SupplierFor(string name) => suppliers.FirstOrDefault(s => s.Name == name) ?? suppliers[0];
+
+            var allMeds = await context.Medicines.OrderBy(m => m.Id).ToListAsync();
+            if (allMeds.Count == 0) return;
+            var medsByName = allMeds.ToDictionary(m => m.Name);
+
+            // Prefer well-known catalog medicines by name; otherwise fall back to
+            // the catalog's first entries so any seeded database still gets rows.
+            var fallbackCursor = 0;
+            Medicine Resolve(string name)
+                => medsByName.TryGetValue(name, out var m)
+                   ? m
+                   : allMeds[fallbackCursor++ % allMeds.Count];
+
+            var samplePos = new List<PurchaseOrder>();
+            void AddPo(string supplier, int daysAgo, PurchaseOrderStatus status,
+                params (string medicine, int qty, decimal cost)[] lines)
+            {
+                var po = new PurchaseOrder
+                {
+                    SupplierId = SupplierFor(supplier).Id,
+                    OrderDate = DateTime.Today.AddDays(-daysAgo),
+                    Status = status
+                };
+                foreach (var line in lines)
+                    po.Details.Add(new PurchaseOrderDetail
+                    {
+                        MedicineId = Resolve(line.medicine).Id,
+                        Quantity = line.qty,
+                        UnitCost = line.cost
+                    });
+                samplePos.Add(po);
+            }
+
+            AddPo("MediSource PH", 35, PurchaseOrderStatus.Received,
+                ("Tempra 500mg", 200, 6.00m), ("Alaxan FR", 100, 11.50m));
+            AddPo("PharmaLink Distributors", 28, PurchaseOrderStatus.Received,
+                ("Augmentin 625mg", 150, 30.00m));
+            AddPo("HealthWell Supply Co.", 20, PurchaseOrderStatus.Received,
+                ("Betaloc 50mg", 120, 9.75m), ("Claritin 10mg", 80, 21.50m));
+            AddPo("HealthWell Supply Co.", 12, PurchaseOrderStatus.Pending,
+                ("Januvia 100mg", 160, 36.50m));
+            AddPo("MediSource PH", 6, PurchaseOrderStatus.Pending,
+                ("Buscopan 10mg", 100, 14.20m), ("Tempra 500mg", 300, 6.00m));
+            AddPo("PharmaLink Distributors", 3, PurchaseOrderStatus.Pending,
+                ("Ciprox 500mg", 200, 22.00m), ("Allerkid 5mg/5mL", 50, 21.50m));
+            AddPo("HealthWell Supply Co.", 1, PurchaseOrderStatus.Pending,
+                ("Forxiga 10mg", 140, 38.00m));
+            AddPo("MediSource PH", 0, PurchaseOrderStatus.Cancelled,
+                ("Fluimucil 600mg", 60, 11.50m));
+
+            if (samplePos.Count == 0) return;
+            context.PurchaseOrders.AddRange(samplePos);
+            await context.SaveChangesAsync();
         }
 
         private static async Task CreateUserIfNotExists(

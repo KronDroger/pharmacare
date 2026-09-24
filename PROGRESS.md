@@ -125,3 +125,22 @@
 - [x] Demo account seeds (`CreateUserIfNotExists` x5) gated to `IHostEnvironment.IsDevelopment()`; "Quick Demo Logins" autofill chips only render in Development
 - [x] Removed the fake tile-CAPTCHA ("Select all images") markup/JS and the `/Account/ConfirmCaptcha` endpoint + `RecaptchaService`/`IRecaptchaService` (server verification no longer expected)
 - [x] Verified e2e: login page clean of captcha, ConfirmCaptcha 404s, normal login works, 5 failed attempts lock the account (correct password then rejected with the lock message), other accounts unaffected
+
+## Phase 17: Purchase Order Sample Data — Seed for Filters Demo (done)
+- [x] Added idempotent `EnsurePurchaseOrderDataAsync(context)` to `Data/DbInitializer.cs` (guard: `if (context.PurchaseOrders.AnyAsync()) return;` — no duplicates, fresh-install safe) and registered the call next to the existing Ensure* calls in `SeedAsync` (~line 216)
+- [x] No controller / view / migration changes — the PurchaseOrders filters already support `search`, `status`, `from`, `to`
+- [x] Suppliers looked up by name (fallback to first supplier); medicines resolved by name with a fallback to the catalog's first entries (so DBs seeded with only the 35+ rich catalog, which lack "Biogesic 500mg" etc., still get rows). Seeded 8 POs (1–2 line items each), spread across suppliers and OrderDates (last ~35 days → today):
+
+| # | Supplier (by name) | OrderDate | Status | Line items (Medicine × Qty @ UnitCost) |
+|---|--------------------|-----------|--------|----------------------------------------|
+| 1 | MediSource PH | −35d | Received | Tempra 500mg ×200 @6.00, Alaxan FR ×100 @11.50 |
+| 2 | PharmaLink Distributors | −28d | Received | Augmentin 625mg ×150 @30.00 |
+| 3 | HealthWell Supply Co. | −20d | Received | Betaloc 50mg ×120 @9.75, Claritin 10mg ×80 @21.50 |
+| 4 | HealthWell Supply Co. | −12d | Pending | Januvia 100mg ×160 @36.50 |
+| 5 | MediSource PH | −6d | Pending | Buscopan 10mg ×100 @14.20, Tempra 500mg ×300 @6.00 |
+| 6 | PharmaLink Distributors | −3d | Pending | Ciprox 500mg ×200 @22.00, Allerkid 5mg/5mL ×50 @21.50 |
+| 7 | HealthWell Supply Co. | −1d | Pending | Forxiga 10mg ×140 @38.00 |
+| 8 | MediSource PH | today | Cancelled | Fluimucil 600mg ×60 @11.50 |
+
+- [x] Verified live: `dotnet build` 0 warn/err → ran `--launch-profile http` (localhost:5000) → auto-login via decoded `captchaToken` → `/PurchaseOrders?pageSize=100` total = **8**; narrowing `status=Received` → **3**, `status=Pending` → **4**, `status=Cancelled` → **1**, `search=MediSource` → **3**, `from=2026-08-01&to=2026-09-10` → **3**, `from=2026-09-11&to=2026-09-30` → **5**; filter bar (search/status/from/to) renders; restarted the app and the total stayed **8** (idempotent — no duplicate rows); app stopped
+- [x] Committed separately
