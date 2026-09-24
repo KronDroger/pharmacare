@@ -21,9 +21,9 @@
                     <td class="num">@t.DiscountPercent.ToString("0.##")%</td>
                     <td>
                         @if (t.FreeDelivery) { <span class="badge text-bg-success">Free Delivery</span> }
-                        @if (t.PriorityDispensing) { <span class="badge text-bg-primary">Priority</span> }
+                        @if (t.PriorityDispensing) { <span class="badge text-bg-primary">Priority Dispensing</span> }
                         @if (t.HasDedicatedPharmacist) { <span class="badge text-bg-warning">Dedicated Pharmacist</span> }
-                        @if (t.MaxFamilyAccounts > 1) { <span class="badge text-bg-info">Family: @t.MaxFamilyAccounts</span> }
+                        @if (t.MaxFamilyAccounts > 1) { <span class="badge text-bg-info">Family x@(t.MaxFamilyAccounts)</span> }
                         @if (!t.FreeDelivery && !t.PriorityDispensing && !t.HasDedicatedPharmacist && t.MaxFamilyAccounts <= 1) { <span class="text-muted">—</span> }
                     </td>
                     <td>
