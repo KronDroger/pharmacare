@@ -67,8 +67,8 @@ namespace CarePlusPharmacy.Controllers
             }
 
             // KPIs reflect the filtered ledger (independent of page number)
-            var allSalesData = await baseQuery.Select(s => new { Discount = s.DiscountAmount, Gross = s.Details.Sum(d => (decimal?)(d.Quantity * d.UnitPrice)) ?? 0m }).ToListAsync();
-            ViewBag.TotalRevenueAll = allSalesData.Sum(s => Math.Max(0, s.Gross - s.Discount));
+            var allSalesData = await baseQuery.Select(s => new { Discount = s.DiscountAmount, Vat = s.VatAmount, Gross = s.Details.Sum(d => (decimal?)(d.Quantity * d.UnitPrice)) ?? 0m, Statutory = s.DiscountType == SaleDiscountType.Senior || s.DiscountType == SaleDiscountType.Pwd }).ToListAsync();
+            ViewBag.TotalRevenueAll = allSalesData.Sum(s => Math.Max(0, s.Gross - (s.Statutory ? s.Vat : 0) - s.Discount));
             ViewBag.TotalCountAll = await baseQuery.CountAsync();
             ViewBag.TotalItemsAll = await baseQuery.SelectMany(s => s.Details).SumAsync(d => (int?)d.Quantity) ?? 0;
             ViewBag.TotalPointsAll = await baseQuery.SumAsync(s => (int?)s.PointsEarned) ?? 0;

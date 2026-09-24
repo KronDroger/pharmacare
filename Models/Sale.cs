@@ -76,7 +76,12 @@ namespace CarePlusPharmacy.Models
         public decimal GrossAmount => Details?.Sum(d => d.Quantity * d.UnitPrice) ?? 0;
 
         [Display(Name = "Net Total")]
-        public decimal TotalAmount => Math.Max(0, GrossAmount - DiscountAmount);
+        public decimal TotalAmount => (DiscountType == SaleDiscountType.Senior || DiscountType == SaleDiscountType.Pwd)
+            // Senior/PWD: VAT is fully removed from the total and the 20% discount
+            // is applied on the VAT-exclusive amount (which DiscountAmount already is).
+            ? Math.Max(0, GrossAmount - VatAmount - DiscountAmount)
+            // None: VAT-inclusive pricing already accounts for VAT (plus any points redemption).
+            : Math.Max(0, GrossAmount - DiscountAmount);
 
         public Billing? Billing { get; set; }
     }
