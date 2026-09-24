@@ -34,6 +34,7 @@
     int lowStockCount = 0;
     CarePlusPharmacy.Models.Customer? portalCustomer = null;
     int activeSubCount = 0;
+    int activeMembershipCount = 0;
     try
     {
         var now = DateTime.Today;
@@ -48,6 +49,8 @@
             {
                 activeSubCount = DbContext.CustomerSubscriptions.Count(s =>
                     s.CustomerId == portalCustomer.Id && s.Status == CarePlusPharmacy.Models.SubscriptionStatus.Active);
+                activeMembershipCount = DbContext.CustomerMemberships.Count(m =>
+                    m.CustomerId == portalCustomer.Id && m.Status == CarePlusPharmacy.Models.MembershipStatus.Active);
             }
         }
     }
@@ -194,6 +197,14 @@
                         @if (activeSubCount > 0)
                         {
                             <span class="badge nav-badge" style="background-color: var(--cp-success); color: #ffffff;">@activeSubCount active</span>
+                        }
+                    </a>
+                    <a class="nav-link @(currentCtrl == "Portal" && currentAct == "Membership" ? "active" : "")" asp-controller="Portal" asp-action="Membership" data-bs-toggle="tooltip" data-bs-placement="right" title="My Membership">
+                        <i class="bi bi-patch-check-fill"></i>
+                        <span class="nav-text">My Membership</span>
+                        @if (activeMembershipCount > 0)
+                        {
+                            <span class="badge nav-badge" style="background-color: var(--cp-success); color: #ffffff;">member</span>
                         }
                     </a>
                     <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "Browse" ? "active" : "")" asp-controller="Subscriptions" asp-action="Browse" data-bs-toggle="tooltip" data-bs-placement="right" title="Browse Refill Plans">

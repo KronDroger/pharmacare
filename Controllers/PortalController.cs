@@ -357,6 +357,114 @@ namespace CarePlusPharmacy.Controllers
             return RedirectToAction(nameof(Subscriptions));
         }
 
+        // ---------- MEMBERSHIP ----------
+
+        public async Task<IActionResult> Membership()
+        {
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
+            if (customer == null)
+            {
+                TempData["Error"] = "No patient profile is linked to your account yet. Ask the pharmacy to link your account so you can use the portal.";
+                return View(new PortalMembershipViewModel());
+            }
+
+            var memberships = await _context.CustomerMemberships
+                .Include(m => m.MembershipTier)
+                .Where(m => m.CustomerId == customer.Id)
+                .OrderByDescending(m => m.StartDate)
+                .ThenByDescending(m => m.Id)
+                .ToListAsync();
+
+            var vm = new PortalMembershipViewModel
+            {
+                Customer = customer,
+                CurrentMembership = memberships.FirstOrDefault(m => m.Status == MembershipStatus.Active),
+                Tiers = await _context.MembershipTiers
+                    .Where(t => t.IsActive)
+                    .OrderBy(t => t.MonthlyPrice)
+                    .ThenBy(t => t.Name)
+                    .ToListAsync(),
+                History = memberships
+            };
+            return View(vm);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Subscribe(int id)
+        {
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
+            if (customer == null)
+            {
+                TempData["Error"] = "No patient profile is linked to your account yet. Ask the pharmacy to link your account.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            var tier = await _context.MembershipTiers.FindAsync(id);
+            if (tier == null || !tier.IsActive)
+            {
+                TempData["Error"] = "That membership tier is not available right now.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            var current = await _context.CustomerMemberships
+                .FirstOrDefaultAsync(m => m.CustomerId == customer.Id && m.Status == MembershipStatus.Active);
+
+            var switched = false;
+            if (current != null)
+            {
+                if (current.MembershipTierId == tier.Id)
+                {
+                    TempData["Success"] = $"You are already subscribed to {tier.Name}.";
+                    return RedirectToAction(nameof(Membership));
+                }
+                current.Status = MembershipStatus.Cancelled;
+                switched = true;
+            }
+
+            _context.CustomerMemberships.Add(new CustomerMembership
+            {
+                CustomerId = customer.Id,
+                MembershipTierId = tier.Id,
+                StartDate = DateTime.Today,
+                NextBillingDate = DateTime.Today.AddMonths(1),
+                Status = MembershipStatus.Active,
+                PaymentMethod = "Portal"
+            });
+            await _context.SaveChangesAsync();
+            await LogCustomerActionAsync("MEMBERSHIP_SUBSCRIBED", $"Customer subscribed to tier '{tier.Name}' (₱{tier.MonthlyPrice:N2}/month).");
+            TempData["Success"] = switched
+                ? $"Membership switched to {tier.Name}."
+                : $"Welcome to {tier.Name}! Your membership is now active.";
+            return RedirectToAction(nameof(Membership));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelMembership(int id)
+        {
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
+            if (customer == null)
+            {
+                TempData["Error"] = "No patient profile is linked to your account yet. Ask the pharmacy to link your account.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            var membership = await _context.CustomerMemberships
+                .Include(m => m.MembershipTier)
+                .FirstOrDefaultAsync(m => m.Id == id && m.CustomerId == customer.Id);
+            if (membership == null) return NotFound();
+
+            if (membership.Status == MembershipStatus.Active)
+            {
+                membership.Status = MembershipStatus.Cancelled;
+                await _context.SaveChangesAsync();
+                await LogCustomerActionAsync("MEMBERSHIP_CANCELLED", $"Customer cancelled membership tier '{membership.MembershipTier?.Name}'.");
+                TempData["Success"] = "Your membership has been cancelled.";
+            }
+            return RedirectToAction(nameof(Membership));
+        }
+
         // ---------- HELPERS ----------
 
         private async Task LogCustomerActionAsync(string action, string details)

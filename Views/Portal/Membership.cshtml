@@ -1,0 +1,153 @@
+@model PortalMembershipViewModel
+@{ ViewData["Title"] = "My Membership"; }
+
+@if (Model.Customer == null)
+{
+    <div class="table-card p-5 text-center text-muted">
+        No patient profile is linked to your account yet. Ask the pharmacy to link your account so you can use the portal.
+    </div>
+    return;
+}
+
+@{
+    var cur = Model.CurrentMembership;
+    string PerksRow(CarePlusPharmacy.Models.MembershipTier t)
+    {
+        var s = "";
+        if (t.FreeDelivery) s += "<span class=\"badge text-bg-success\">Free Delivery</span> ";
+        if (t.PriorityDispensing) s += "<span class=\"badge text-bg-primary\">Priority</span> ";
+        if (t.HasDedicatedPharmacist) s += "<span class=\"badge text-bg-warning\">Dedicated Pharmacist</span> ";
+        if (t.MaxFamilyAccounts > 1) s += "<span class=\"badge text-bg-info\">Family: " + t.MaxFamilyAccounts + "</span> ";
+        if (s == "") s = "<span class=\"text-muted\">—</span>";
+        return s;
+    }
+}
+
+<div class="table-card">
+    <div class="table-card-header">
+        <div>
+            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-patch-check-fill text-success me-2"></i>My Membership</div>
+            <div class="text-muted" style="font-size: 12px;">Enroll in a paid membership for a discount, free delivery and premium perks</div>
+        </div>
+        @if (cur != null)
+        {
+            <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 13px; padding: 6px 12px;">
+                <i class="bi bi-check-circle"></i> @cur.MembershipTier?.Name Active
+            </span>
+        }
+    </div>
+
+    @if (cur != null)
+    {
+        <div class="p-3">
+            <div class="border rounded p-3" style="border-color: var(--cp-success-border, #cfe6d8) !important;">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-7">
+                        <div class="fw-bold fs-5" style="color: var(--cp-forest-deep);">@cur.MembershipTier?.Name</div>
+                        <div class="text-muted" style="font-size: 12.5px;">₱@(cur.MembershipTier?.MonthlyPrice.ToString("N2")) / month · @(cur.MembershipTier?.DiscountPercent.ToString("0.##"))% off</div>
+                        <div class="mt-1">@Html.Raw(PerksRow(cur.MembershipTier!))</div>
+                        <div class="text-muted mt-1" style="font-size: 12.5px;">Active since <strong>@cur.StartDate.ToString("yyyy-MM-dd")</strong> · Next billing <strong>@cur.NextBillingDate.ToString("yyyy-MM-dd")</strong></div>
+                    </div>
+                    <div class="col-md-5 text-md-end">
+                        <form asp-action="CancelMembership" asp-route-id="@cur.Id" method="post" class="d-inline" onsubmit="return confirm('Cancel your membership? You will lose your membership benefits.');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Cancel Membership</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="p-3">
+            <div class="alert" style="background-color: var(--cp-warning-bg, #fff4d6); color: #8a6d1d; margin-bottom: 0;">
+                You don't have an active membership yet. Pick a tier below to start enjoying member benefits.
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3 mt-0">
+    @if (!Model.Tiers.Any())
+    {
+        <div class="col-12 text-center text-muted py-5">No membership tiers are available right now.</div>
+    }
+    @foreach (var t in Model.Tiers)
+    {
+        <div class="col-md-4">
+            <div class="border rounded table-card h-100 d-flex flex-column" style="border: 1px solid #dee2e6;">
+                <div class="p-3 pb-2">
+                    <div class="fw-bold" style="color: var(--cp-forest-deep);">@t.Name</div>
+                    <div class="fs-4 fw-bold text-success mt-1">₱@t.MonthlyPrice.ToString("N2") <span class="fs-6 text-muted fw-normal">/ month</span></div>
+                    <div class="text-muted" style="font-size: 12.5px;">@t.DiscountPercent.ToString("0.##")% off on every purchase</div>
+                </div>
+                <div class="px-3 pb-2">
+                    <ul class="list-unstyled small mb-0" style="font-size: 13px;">
+                        <li><i class="bi bi-check-lg text-success me-1"></i>@t.DiscountPercent.ToString("0.##")% discount</li>
+                        <li><i class="bi bi-check-lg text-success me-1"></i>@(t.FreeDelivery ? "Free delivery" : "Standard delivery")</li>
+                        @if (t.PriorityDispensing) { <li><i class="bi bi-check-lg text-success me-1"></i>Priority dispensing</li> }
+                        @if (t.HasDedicatedPharmacist) { <li><i class="bi bi-check-lg text-success me-1"></i>Dedicated pharmacist</li> }
+                        <li><i class="bi bi-check-lg text-success me-1"></i>Up to @t.MaxFamilyAccounts family account(s)</li>
+                    </ul>
+                </div>
+                <div class="p-3 pt-2 mt-auto">
+                    @if (cur != null && cur.MembershipTierId == t.Id)
+                    {
+                        <button type="button" class="btn btn-outline-success w-100" disabled><i class="bi bi-check-lg"></i> Current Plan</button>
+                    }
+                    else
+                    {
+                        <form asp-action="Subscribe" asp-route-id="@t.Id" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-careplus w-100">@(cur != null ? "Switch to This Plan" : "Subscribe Now")</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.History.Any())
+{
+    <div class="table-card mt-3">
+        <div class="table-card-header">
+            <div>
+                <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-clock-history me-2"></i>Membership History</div>
+                <div class="text-muted" style="font-size: 12px;">Your past and current membership enrollments</div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr><th>Tier</th><th>Started</th><th>Next Billing</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.History)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@m.MembershipTier?.Name</td>
+                            <td>@m.StartDate.ToString("yyyy-MM-dd")</td>
+                            <td>@m.NextBillingDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                @switch (m.Status)
+                                {
+                                    case MembershipStatus.Active:
+                                        <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);">Active</span>
+                                        break;
+                                    case MembershipStatus.Paused:
+                                        <span class="badge" style="background-color: var(--cp-warning-bg); color: var(--cp-warning);">Paused</span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-secondary">Cancelled</span>
+                                        break;
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
