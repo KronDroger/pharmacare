@@ -231,8 +231,8 @@
                     }
                     @if (User.IsInRole("Admin"))
                     {
-                        <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "Plans" ? "active" : "")" asp-controller="Subscriptions" asp-action="Plans" data-bs-toggle="tooltip" data-bs-placement="right" title="Subscription Plans">
-                            <i class="bi bi-arrow-repeat"></i> <span class="nav-text">Subscription Plans</span>
+                        <a class="nav-link @(currentCtrl == "Subscriptions" && currentAct == "Plans" ? "active" : "")" asp-controller="Subscriptions" asp-action="Plans" data-bs-toggle="tooltip" data-bs-placement="right" title="Refill Plans">
+                            <i class="bi bi-arrow-repeat"></i> <span class="nav-text">Refill Plans</span>
                         </a>
                         <a class="nav-link @(currentCtrl == "MembershipTiers" ? "active" : "")" asp-controller="MembershipTiers" asp-action="Index" data-bs-toggle="tooltip" data-bs-placement="right" title="Membership Tiers">
                             <i class="bi bi-patch-check-fill"></i> <span class="nav-text">Membership Tiers</span>

@@ -55,7 +55,16 @@ namespace CarePlusPharmacy.Controllers
             {
                 _context.Add(plan);
                 await _context.SaveChangesAsync();
-                TempData["Success"] = "Subscription plan created.";
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    UserName = User.Identity?.Name ?? "Admin",
+                    UserRole = "Admin",
+                    Action = "PLAN_CREATED",
+                    Module = "Refill Plans",
+                    Details = $"Created refill plan '{plan.Name}' (medicine #{plan.MedicineId}, {plan.Quantity} unit(s) every {plan.IntervalDays} days, ₱{plan.Price:N2})."
+                });
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Refill plan created.";
                 return RedirectToAction(nameof(Plans));
             }
             ViewBag.Medicines = _context.Medicines.OrderBy(m => m.Name).ToList();
@@ -82,7 +91,16 @@ namespace CarePlusPharmacy.Controllers
             {
                 _context.Update(plan);
                 await _context.SaveChangesAsync();
-                TempData["Success"] = "Subscription plan updated.";
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    UserName = User.Identity?.Name ?? "Admin",
+                    UserRole = "Admin",
+                    Action = "PLAN_UPDATED",
+                    Module = "Refill Plans",
+                    Details = $"Updated refill plan '{plan.Name}' ({plan.Quantity} unit(s) every {plan.IntervalDays} days, ₱{plan.Price:N2}, active: {plan.IsActive})."
+                });
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Refill plan updated.";
                 return RedirectToAction(nameof(Plans));
             }
             ViewBag.Medicines = _context.Medicines.OrderBy(m => m.Name).ToList();
@@ -94,12 +112,28 @@ namespace CarePlusPharmacy.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> PlanDelete(int id)
         {
-            var plan = await _context.SubscriptionPlans.FindAsync(id);
+            var plan = await _context.SubscriptionPlans.Include(p => p.Subscriptions).FirstOrDefaultAsync(p => p.Id == id);
             if (plan != null)
             {
+                int enrolled = plan.Subscriptions.Count;
+                if (enrolled > 0)
+                {
+                    TempData["Error"] = $"Cannot delete '{plan.Name}' — {enrolled} customer subscription(s) reference this plan. Deactivate it instead; existing subscriptions stay intact.";
+                    return RedirectToAction(nameof(Plans));
+                }
+
                 _context.SubscriptionPlans.Remove(plan);
                 await _context.SaveChangesAsync();
-                TempData["Success"] = "Subscription plan removed.";
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    UserName = User.Identity?.Name ?? "Admin",
+                    UserRole = "Admin",
+                    Action = "PLAN_DELETED",
+                    Module = "Refill Plans",
+                    Details = $"Deleted refill plan '{plan.Name}'."
+                });
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Refill plan removed.";
             }
             return RedirectToAction(nameof(Plans));
         }

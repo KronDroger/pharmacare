@@ -10,6 +10,13 @@
         <a asp-controller="Portal" asp-action="Subscriptions" class="btn btn-sm btn-outline-careplus">My Subscriptions</a>
     </div>
 
+    <div class="px-3 pt-3">
+        <div class="alert d-flex align-items-center gap-2 mb-0 py-2" style="background-color: var(--cp-warning-bg, #fff4d6); color: #8a6d1d; font-size: 12.5px; border-radius: 6px;">
+            <i class="bi bi-info-circle"></i>
+            <span>Refill plans are per-medicine recurring purchases — separate from paid <a asp-controller="Portal" asp-action="Membership" class="link-secondary"><u>membership tiers</u></a> (discounts &amp; perks like free delivery). Subscribing here does not enroll you in a membership.</span>
+        </div>
+    </div>
+
     <div class="p-3">
         <div class="row g-3">
             @if (!Model.Any())
