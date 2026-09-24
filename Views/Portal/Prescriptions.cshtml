@@ -27,18 +27,26 @@
                     <div class="fw-bold">Rx #@p.Id</div>
                     <div class="text-muted" style="font-size: 12px;">Dr. @p.DoctorName · Written @p.DatePrescribed.ToString("yyyy-MM-dd")</div>
                 </div>
-                @switch (p.Status)
-                {
-                    case PrescriptionStatus.Pending:
-                        <span class="badge" style="background-color: var(--cp-warning-bg); color: var(--cp-warning);">Pending</span>
-                        break;
-                    case PrescriptionStatus.Fulfilled:
-                        <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);">Fulfilled</span>
-                        break;
-                    default:
-                        <span class="badge bg-secondary">Cancelled</span>
-                        break;
-                }
+                <div class="d-flex align-items-center gap-2">
+                    @if (ViewBag.MembershipPriorityDispensing == true)
+                    {
+                        <span class="badge" style="background-color: var(--cp-info-bg); color: var(--cp-info);">
+                            <i class="bi bi-lightning-charge me-1"></i>Priority Dispensing
+                        </span>
+                    }
+                    @switch (p.Status)
+                    {
+                        case PrescriptionStatus.Pending:
+                            <span class="badge" style="background-color: var(--cp-warning-bg); color: var(--cp-warning);">Pending</span>
+                            break;
+                        case PrescriptionStatus.Fulfilled:
+                            <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success);">Fulfilled</span>
+                            break;
+                        default:
+                            <span class="badge bg-secondary">Cancelled</span>
+                            break;
+                    }
+                </div>
             </div>
 
             <div class="table-responsive">

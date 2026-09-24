@@ -81,6 +81,14 @@
         }
     </div>
 
+    @if (ViewBag.MembershipFreeDelivery == true)
+    {
+        <div class="d-flex justify-content-between align-items-center my-2 p-2 rounded" style="background: var(--cp-success-bg); font-size: 11.5px; color: var(--cp-success);">
+            <span class="fw-bold"><i class="bi bi-truck me-1"></i>Free Delivery Included</span>
+            <span class="text-muted" style="font-size: 10px;">Membership perk — no delivery fee</span>
+        </div>
+    }
+
     <!-- Line Items -->
     <table class="w-100 my-2" style="font-size: 12px; border-collapse: collapse;">
         <thead>

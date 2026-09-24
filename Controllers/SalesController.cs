@@ -652,6 +652,24 @@ namespace CarePlusPharmacy.Controllers
                 .FirstOrDefaultAsync(s => s.Id == id);
 
             if (sale == null) return NotFound();
+
+            // Display-only membership perks on the receipt (Free Delivery badge)
+            // derived from the customer's current active membership.
+            if (sale.CustomerId.HasValue)
+            {
+                var tier = (await _context.CustomerMemberships
+                    .Include(m => m.MembershipTier)
+                    .Where(m => m.CustomerId == sale.CustomerId.Value && m.Status == MembershipStatus.Active)
+                    .OrderByDescending(m => m.StartDate)
+                    .ThenByDescending(m => m.Id)
+                    .FirstOrDefaultAsync())?.MembershipTier;
+                ViewBag.MembershipFreeDelivery = tier?.FreeDelivery == true;
+            }
+            else
+            {
+                ViewBag.MembershipFreeDelivery = false;
+            }
+
             return View(sale);
         }
     }

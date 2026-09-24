@@ -191,6 +191,7 @@ namespace CarePlusPharmacy.Controllers
                 .ThenByDescending(s => s.Id);
 
             var sales = await PaginatedList<Sale>.CreateAsync(query, page, pageSize);
+            ViewBag.MembershipFreeDelivery = (await GetActiveMembershipTierAsync(customer.Id))?.FreeDelivery == true;
             return View(sales);
         }
 
@@ -225,6 +226,7 @@ namespace CarePlusPharmacy.Controllers
                 .OrderByDescending(p => p.DatePrescribed)
                 .ThenByDescending(p => p.Id)
                 .ToListAsync();
+            ViewBag.MembershipPriorityDispensing = (await GetActiveMembershipTierAsync(customer.Id))?.PriorityDispensing == true;
             return View(list);
         }
 
@@ -466,6 +468,14 @@ namespace CarePlusPharmacy.Controllers
         }
 
         // ---------- HELPERS ----------
+
+        private async Task<MembershipTier?> GetActiveMembershipTierAsync(int customerId)
+            => (await _context.CustomerMemberships
+                .Include(m => m.MembershipTier)
+                .Where(m => m.CustomerId == customerId && m.Status == MembershipStatus.Active)
+                .OrderByDescending(m => m.StartDate)
+                .ThenByDescending(m => m.Id)
+                .FirstOrDefaultAsync())?.MembershipTier;
 
         private async Task LogCustomerActionAsync(string action, string details)
         {

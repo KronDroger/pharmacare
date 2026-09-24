@@ -74,6 +74,12 @@
             <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-bag-check text-success me-2"></i>Purchase History</div>
             <div class="text-muted" style="font-size: 12px;">Every transaction recorded under your patient record</div>
         </div>
+        @if (ViewBag.MembershipFreeDelivery == true)
+        {
+            <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 12px; padding: 6px 12px;">
+                <i class="bi bi-truck me-1"></i>Free Delivery Included
+            </span>
+        }
     </div>
 
     <div class="table-responsive">
