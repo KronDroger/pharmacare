@@ -43,14 +43,15 @@ namespace CarePlusPharmacy.Controllers
         public IActionResult PlanCreate()
         {
             ViewBag.Medicines = _context.Medicines.OrderBy(m => m.Name).ToList();
-            return View();
+            return View(new SubscriptionPlan { IsActive = true });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> PlanCreate([Bind("Name,MedicineId,Quantity,IntervalDays,Price,IsActive")] SubscriptionPlan plan)
+        public async Task<IActionResult> PlanCreate([Bind("Name,MedicineId,Quantity,IntervalDays,Price")] SubscriptionPlan plan)
         {
+            plan.IsActive = Request.Form.ContainsKey("IsActive");
             if (ModelState.IsValid)
             {
                 _context.Add(plan);
@@ -84,9 +85,10 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> PlanEdit(int id, [Bind("Id,Name,MedicineId,Quantity,IntervalDays,Price,IsActive")] SubscriptionPlan plan)
+        public async Task<IActionResult> PlanEdit(int id, [Bind("Id,Name,MedicineId,Quantity,IntervalDays,Price")] SubscriptionPlan plan)
         {
             if (id != plan.Id) return NotFound();
+            plan.IsActive = Request.Form.ContainsKey("IsActive");
             if (ModelState.IsValid)
             {
                 _context.Update(plan);
