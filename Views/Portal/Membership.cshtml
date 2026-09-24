@@ -79,7 +79,7 @@
     {
         var isCurrent = t.Id == currentTierId;
         var isCurrentFree = isCurrent && cur == null && freeTier != null && t.Id == freeTier.Id;
-        var cardStyle = "border:1px solid #dee2e6;" + (isCurrentFree ? " opacity:.6;" : "");
+        var cardStyle = "border:1px solid #dee2e6;" + (isCurrentFree ? " opacity:.75;" : "");
         <div class="col-md-4">
             <div class="border rounded table-card h-100 d-flex flex-column" style="@cardStyle">
                 <div class="p-3 pb-2">
@@ -99,7 +99,7 @@
                 <div class="p-3 pt-2 mt-auto">
                     @if (isCurrent)
                     {
-                        <button type="button" class="btn w-100 @(isCurrentFree ? "btn-outline-secondary" : "btn-outline-success")" disabled>
+                        <button type="button" class="btn w-100 @(isCurrentFree ? "btn-secondary" : "btn-outline-success")" disabled>
                             <i class="bi @(isCurrentFree ? "bi-star" : "bi-check-lg")"></i> @(isCurrentFree ? "Current Plan — Free" : "Current Plan")
                         </button>
                     }
