@@ -48,6 +48,13 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "Discount (₱)")]
         public decimal DiscountAmount { get; set; } = 0;
 
+        // Clean source of the single applied discount: "None", "SeniorPWD", or
+        // "Membership:<TierName>". A membership tier discount and the Senior/PWD
+        // statutory discount are never stacked — only the larger one is applied.
+        [StringLength(100)]
+        [Display(Name = "Discount Source")]
+        public string AppliedDiscountSource { get; set; } = "None";
+
         [Display(Name = "Points Earned")]
         public int PointsEarned { get; set; } = 0;
 

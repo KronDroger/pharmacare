@@ -4,6 +4,12 @@
     var statDiscount = Model.PointsRedeemed > 0 && Model.DiscountType != CarePlusPharmacy.Models.SaleDiscountType.None
         ? Math.Max(0, Model.DiscountAmount - Model.PointsRedeemed)
         : Model.DiscountAmount;
+    var memberDiscount = Model.AppliedDiscountSource?.StartsWith("Membership:") == true
+        ? Math.Max(0, Model.DiscountAmount - Model.PointsRedeemed)
+        : 0m;
+    var memberTierName = Model.AppliedDiscountSource?.StartsWith("Membership:") == true
+        ? Model.AppliedDiscountSource!.Substring("Membership:".Length)
+        : null;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
@@ -114,6 +120,13 @@
             <div class="d-flex justify-content-between mb-1 text-primary">
                 <span>@(Model.DiscountType == CarePlusPharmacy.Models.SaleDiscountType.Senior ? "Senior Citizen" : "PWD") Discount (20%)@(string.IsNullOrEmpty(Model.DiscountIdNumber) ? "" : $" · ID {Model.DiscountIdNumber}"):</span>
                 <span>-₱@statDiscount.ToString("N2")</span>
+            </div>
+        }
+        @if (memberDiscount > 0)
+        {
+            <div class="d-flex justify-content-between mb-1 text-success">
+                <span>Membership Discount (@memberTierName):</span>
+                <span>-₱@memberDiscount.ToString("N2")</span>
             </div>
         }
         @if (Model.PointsRedeemed > 0)

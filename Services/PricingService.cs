@@ -12,7 +12,7 @@ namespace CarePlusPharmacy.Services
         public decimal VatableSales { get; init; }
         public decimal VatExemptSales { get; init; }
         public decimal VatAmount { get; init; }
-        public decimal DiscountAmount { get; init; }
+        public decimal DiscountAmount { get; set; }
         public decimal GrossTotal { get; init; }
     }
 

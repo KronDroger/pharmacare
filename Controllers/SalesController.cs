@@ -387,6 +387,16 @@ namespace CarePlusPharmacy.Controllers
                 });
                 var price = _pricingService.Compute(priceLines, model.DiscountType);
 
+                // Membership vs statutory discount — only the LARGER single discount
+                // (member tier % such as VIP/Family/Chronic vs the 20% Senior/PWD) is
+                // applied, never stacked. AppliedDiscountSource records which one won.
+                var appliedDiscountType = model.DiscountType;
+                var appliedSource = model.DiscountType switch
+                {
+                    SaleDiscountType.Senior or SaleDiscountType.Pwd => "SeniorPWD",
+                    _ => "None"
+                };
+
                 // Customer & Loyalty Points processing
                 Customer? customer = null;
 
@@ -395,8 +405,26 @@ namespace CarePlusPharmacy.Controllers
                     customer = await _context.Customers.FindAsync(model.CustomerId.Value);
                     if (customer != null)
                     {
+                        var membershipTier = (await _context.CustomerMemberships
+                            .Include(m => m.MembershipTier)
+                            .Where(m => m.CustomerId == customer.Id && m.Status == MembershipStatus.Active)
+                            .OrderByDescending(m => m.StartDate)
+                            .ThenByDescending(m => m.Id)
+                            .FirstOrDefaultAsync())?.MembershipTier;
+
+                        var membershipDiscount = membershipTier != null && membershipTier.DiscountPercent > 0
+                            ? Math.Round(price.GrossTotal * membershipTier.DiscountPercent / 100m, 2, MidpointRounding.AwayFromZero)
+                            : 0m;
+
+                        if (membershipDiscount > price.DiscountAmount)
+                        {
+                            appliedDiscountType = SaleDiscountType.None;
+                            appliedSource = $"Membership:{membershipTier!.Name}";
+                            price.DiscountAmount = membershipDiscount;
+                        }
+
                         // 1 point = ₱1.00 discount (capped at the remaining balance
-                        // after the statutory discount, and at available points)
+                        // after the applied discount, and at available points)
                         decimal payableBeforePoints = Math.Max(0, grossTotal - price.DiscountAmount);
                         if (model.PointsToRedeem > 0)
                         {
@@ -427,9 +455,12 @@ namespace CarePlusPharmacy.Controllers
                     VatableSales = price.VatableSales,
                     VatExemptSales = price.VatExemptSales,
                     VatAmount = price.VatAmount,
-                    DiscountType = model.DiscountType,
-                    DiscountIdNumber = string.IsNullOrWhiteSpace(model.DiscountIdNumber) ? null : model.DiscountIdNumber.Trim(),
+                    DiscountType = appliedDiscountType,
+                    DiscountIdNumber = appliedDiscountType != SaleDiscountType.None
+                        ? (string.IsNullOrWhiteSpace(model.DiscountIdNumber) ? null : model.DiscountIdNumber.Trim())
+                        : null,
                     DiscountAmount = price.DiscountAmount + discountAmount,
+                    AppliedDiscountSource = appliedSource,
                     PointsEarned = pointsEarned,
                     PointsRedeemed = pointsRedeemed,
                     Details = saleDetails
@@ -469,7 +500,7 @@ namespace CarePlusPharmacy.Controllers
                     UserRole = User.IsInRole("Admin") ? "Admin" : (User.IsInRole("Pharmacist") ? "Pharmacist" : "Cashier"),
                     Action = "POS_SALE_COMPLETED",
                     Module = "Sales & POS",
-                    Details = $"Processed Sale #{sale.Id} ({sale.PaymentMethod}): ₱{finalAmount:N2} gross ₱{grossTotal:N2} VAT ₱{sale.VatAmount:N2}{(sale.DiscountType != SaleDiscountType.None ? $", {sale.DiscountType} ID {sale.DiscountIdNumber}" : "")}, Issued {billing.InvoiceNumber}",
+                    Details = $"Processed Sale #{sale.Id} ({sale.PaymentMethod}): ₱{finalAmount:N2} gross ₱{grossTotal:N2} VAT ₱{sale.VatAmount:N2}{(sale.DiscountType != SaleDiscountType.None ? $", {sale.DiscountType} ID {sale.DiscountIdNumber}" : (sale.AppliedDiscountSource != "None" ? $", {sale.AppliedDiscountSource}" : ""))}, Issued {billing.InvoiceNumber}",
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
                 });
 
