@@ -25,13 +25,14 @@ namespace CarePlusPharmacy.Controllers
             return View(tiers);
         }
 
-        public IActionResult Create() => View();
+        public IActionResult Create() => View(new MembershipTier());
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            [Bind("Name,MonthlyPrice,DiscountPercent,FreeDelivery,MaxFamilyAccounts,HasDedicatedPharmacist,PriorityDispensing,IsActive")] MembershipTier tier)
+            [Bind("Name,MonthlyPrice,DiscountPercent,FreeDelivery,MaxFamilyAccounts,HasDedicatedPharmacist,PriorityDispensing")] MembershipTier tier)
         {
+            tier.IsActive = Request.Form.ContainsKey("IsActive");
             if (ModelState.IsValid)
             {
                 _context.Add(tier);
@@ -62,9 +63,10 @@ namespace CarePlusPharmacy.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id,
-            [Bind("Id,Name,MonthlyPrice,DiscountPercent,FreeDelivery,MaxFamilyAccounts,HasDedicatedPharmacist,PriorityDispensing,IsActive")] MembershipTier tier)
+            [Bind("Id,Name,MonthlyPrice,DiscountPercent,FreeDelivery,MaxFamilyAccounts,HasDedicatedPharmacist,PriorityDispensing")] MembershipTier tier)
         {
             if (id != tier.Id) return NotFound();
+            tier.IsActive = Request.Form.ContainsKey("IsActive");
             if (ModelState.IsValid)
             {
                 _context.Update(tier);

@@ -12,7 +12,7 @@
         <div class="form-check form-switch mb-2"><input asp-for="FreeDelivery" class="form-check-input" /><label class="form-check-label">Free delivery included</label></div>
         <div class="form-check form-switch mb-2"><input asp-for="PriorityDispensing" class="form-check-input" /><label class="form-check-label">Priority dispensing</label></div>
         <div class="form-check form-switch mb-2"><input asp-for="HasDedicatedPharmacist" class="form-check-input" /><label class="form-check-label">Dedicated pharmacist</label></div>
-        <div class="form-check form-switch mb-3"><input type="hidden" name="IsActive" value="false" /><input asp-for="IsActive" class="form-check-input" /><label class="form-check-label">Active (available for signup)</label></div>
+        <div class="form-check form-switch mb-3"><input asp-for="IsActive" class="form-check-input" /><label class="form-check-label">Active (available for signup)</label></div>
         <button type="submit" class="btn btn-accent">Add Tier</button>
         <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
     </form>
