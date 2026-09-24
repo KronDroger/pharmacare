@@ -17,13 +17,64 @@ namespace CarePlusPharmacy.Controllers
 
         private bool CanEdit => User.IsInRole("Admin") || User.IsInRole("Cashier");
 
-        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? city, string? gender, string? tier, int page = 1, int pageSize = 10)
         {
             var query = _context.Customers.Include(c => c.Sales).AsQueryable();
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(c => c.FullName.Contains(search));
+            {
+                search = search.Trim();
+                query = query.Where(c =>
+                    c.FullName.Contains(search)
+                    || c.Phone.Contains(search)
+                    || (c.Email != null && c.Email.Contains(search)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                query = query.Where(c => c.City == city);
+            }
+
+            if (!string.IsNullOrWhiteSpace(gender))
+            {
+                query = query.Where(c => c.Gender == gender);
+            }
+
+            if (!string.IsNullOrWhiteSpace(tier))
+            {
+                switch (tier)
+                {
+                    case "Platinum": query = query.Where(c => c.LoyaltyPoints >= 500); break;
+                    case "Gold": query = query.Where(c => c.LoyaltyPoints >= 250 && c.LoyaltyPoints < 500); break;
+                    case "Silver": query = query.Where(c => c.LoyaltyPoints >= 100 && c.LoyaltyPoints < 250); break;
+                    default: query = query.Where(c => c.LoyaltyPoints < 100); break;
+                }
+            }
+
             ViewBag.Search = search;
             ViewBag.CanEdit = CanEdit;
+
+            var cities = await _context.Customers.Where(c => c.City != null).Select(c => c.City!).Distinct().OrderBy(c => c).ToListAsync();
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search name, phone, or email", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "city", Label = "City", Type = Models.ViewModels.FilterFieldType.Select, Value = city,
+                    Options = cities.Select(c => new Models.ViewModels.FilterOption { Value = c, Label = c }).ToList() },
+                new() { Name = "gender", Label = "Gender", Type = Models.ViewModels.FilterFieldType.Select, Value = gender,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Male", Label = "Male" },
+                        new() { Value = "Female", Label = "Female" }
+                    } },
+                new() { Name = "tier", Label = "CRM Tier", Type = Models.ViewModels.FilterFieldType.Select, Value = tier,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Bronze", Label = "Bronze Member" },
+                        new() { Value = "Silver", Label = "Silver Member" },
+                        new() { Value = "Gold", Label = "Gold Member" },
+                        new() { Value = "Platinum", Label = "Platinum VIP" }
+                    } }
+            };
+
             var customers = await PaginatedList<Customer>.CreateAsync(query.OrderBy(c => c.FullName), page, pageSize);
             return View(customers);
         }

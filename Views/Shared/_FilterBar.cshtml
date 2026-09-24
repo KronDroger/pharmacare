@@ -1,0 +1,83 @@
+@using CarePlusPharmacy.Models.ViewModels
+@{
+    var filters = (ViewBag.Filters as IEnumerable<FilterField> ?? Enumerable.Empty<FilterField>())
+        .Where(f => !string.IsNullOrWhiteSpace(f.Name))
+        .ToList();
+
+    if (filters.Any())
+    {
+        var requestQuery = Context.Request.Query;
+        var filterNames = new HashSet<string>(filters.Select(f => f.Name!), StringComparer.OrdinalIgnoreCase);
+
+        // URL that preserves the current non-filter query params (pageSize, tab, ...)
+        // but drops every filter field and resets the page — used by the Clear button.
+        string ClearUrl()
+        {
+            var parts = new List<string>();
+            foreach (var key in requestQuery.Keys)
+            {
+                if (string.IsNullOrEmpty(key)) continue;
+                if (filterNames.Contains(key)) continue;
+                if (key.Equals("page", StringComparison.OrdinalIgnoreCase)) continue;
+                if (key.Equals("print", StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var value in requestQuery[key])
+                {
+                    parts.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value ?? string.Empty)}");
+                }
+            }
+            return parts.Count > 0 ? "?" + string.Join("&", parts) : "";
+        }
+
+        <div class="table-card mb-3 no-print">
+            <div class="p-3">
+                <form method="get" class="row g-2 align-items-end" autocomplete="off">
+                    @* Preserve non-filter query params (page is intentionally omitted so any submit resets to page 1) *@
+                    @foreach (var key in requestQuery.Keys)
+                    {
+                        if (string.IsNullOrEmpty(key)) continue;
+                        if (filterNames.Contains(key)) continue;
+                        if (key.Equals("page", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (key.Equals("print", StringComparison.OrdinalIgnoreCase)) continue;
+                        foreach (var value in requestQuery[key])
+                        {
+                            <input type="hidden" name="@key" value="@value" />
+                        }
+                    }
+
+                    @foreach (var f in filters)
+                    {
+                        <div class="col-auto mb-1 @(f.Type == FilterFieldType.Text ? "col-md-4" : "col-md-2") pe-1">
+                            <label class="form-label text-muted d-block mb-1" style="font-size: 11px; font-weight: 700;">@f.Label</label>
+                            @switch (f.Type)
+                            {
+                                case FilterFieldType.Select:
+                                    <select name="@f.Name" class="form-select form-select-sm">
+                                        <option value="">All</option>
+                                        @foreach (var option in f.Options)
+                                        {
+                                            <option value="@option.Value" selected="@(string.Equals(f.Value, option.Value, StringComparison.OrdinalIgnoreCase))">@option.Label</option>
+                                        }
+                                    </select>
+                                    break;
+                                case FilterFieldType.Date:
+                                    <input type="date" name="@f.Name" value="@f.Value" class="form-control form-control-sm" />
+                                    break;
+                                default:
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                                        <input type="text" name="@f.Name" value="@f.Value" class="form-control border-start-0" placeholder="@f.Label" />
+                                    </div>
+                                    break;
+                            }
+                        </div>
+                    }
+
+                    <div class="col-auto mb-1 d-flex gap-1">
+                        <button type="submit" class="btn btn-sm btn-careplus"><i class="bi bi-funnel me-1"></i>Apply</button>
+                        <a href="@ClearUrl()" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+}

@@ -14,9 +14,51 @@ namespace CarePlusPharmacy.Controllers
         private readonly ApplicationDbContext _context;
         public PurchaseOrdersController(ApplicationDbContext context) => _context = context;
 
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? status, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
         {
-            var query = _context.PurchaseOrders
+            var baseQuery = _context.PurchaseOrders.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim();
+                baseQuery = baseQuery.Where(p =>
+                    p.Id.ToString().Contains(search)
+                    || (p.Supplier != null && p.Supplier.Name.Contains(search))
+                    || p.Details.Any(d => d.Medicine != null && d.Medicine.Name.Contains(search)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<PurchaseOrderStatus>(status, true, out var orderStatus))
+            {
+                baseQuery = baseQuery.Where(p => p.Status == orderStatus);
+            }
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.Date;
+                baseQuery = baseQuery.Where(p => p.OrderDate >= fromDate);
+            }
+
+            if (to.HasValue)
+            {
+                var toDate = to.Value.Date.AddDays(1);
+                baseQuery = baseQuery.Where(p => p.OrderDate < toDate);
+            }
+
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search supplier, medicine, or PO #", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "status", Label = "Order Status", Type = Models.ViewModels.FilterFieldType.Select, Value = status,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Pending", Label = "Pending" },
+                        new() { Value = "Received", Label = "Received" },
+                        new() { Value = "Cancelled", Label = "Cancelled" }
+                    } },
+                new() { Name = "from", Label = "From", Type = Models.ViewModels.FilterFieldType.Date, Value = from?.ToString("yyyy-MM-dd") },
+                new() { Name = "to", Label = "To", Type = Models.ViewModels.FilterFieldType.Date, Value = to?.ToString("yyyy-MM-dd") }
+            };
+
+            var query = baseQuery
                 .Include(p => p.Supplier)
                 .Include(p => p.Details).ThenInclude(d => d.Medicine)
                 .OrderByDescending(p => p.OrderDate)

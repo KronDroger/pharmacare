@@ -79,6 +79,27 @@ namespace CarePlusPharmacy.Controllers
             ViewBag.From = from?.ToString("yyyy-MM-dd");
             ViewBag.To = to?.ToString("yyyy-MM-dd");
 
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search customer, sale #, or invoice #", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "paymentMethod", Label = "Payment Method", Type = Models.ViewModels.FilterFieldType.Select, Value = paymentMethod,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Cash", Label = "Cash" },
+                        new() { Value = "GCash", Label = "GCash" },
+                        new() { Value = "Card", Label = "Card" },
+                        new() { Value = "PayMongo", Label = "PayMongo" }
+                    } },
+                new() { Name = "status", Label = "Ledger Status", Type = Models.ViewModels.FilterFieldType.Select, Value = string.Equals(status, "Voided", StringComparison.OrdinalIgnoreCase) ? "Voided" : "",
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Active", Label = "Active" },
+                        new() { Value = "Voided", Label = "Voided" }
+                    } },
+                new() { Name = "from", Label = "From", Type = Models.ViewModels.FilterFieldType.Date, Value = from?.ToString("yyyy-MM-dd") },
+                new() { Name = "to", Label = "To", Type = Models.ViewModels.FilterFieldType.Date, Value = to?.ToString("yyyy-MM-dd") }
+            };
+
             var query = baseQuery
                 .Include(s => s.Customer)
                 .Include(s => s.Cashier)

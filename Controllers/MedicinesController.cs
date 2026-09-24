@@ -17,11 +17,36 @@ namespace CarePlusPharmacy.Controllers
 
         private bool CanEdit => User.IsInRole("Admin") || User.IsInRole("InventoryCoordinator");
 
-        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? category, string? status, int page = 1, int pageSize = 10)
         {
             var query = _context.Medicines.Include(m => m.Supplier).Include(m => m.Batches).AsQueryable();
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(m => m.Name.Contains(search) || m.Category.Contains(search));
+            {
+                search = search.Trim();
+                query = query.Where(m =>
+                    m.Name.Contains(search)
+                    || m.Category.Contains(search)
+                    || (m.GenericName != null && m.GenericName.Contains(search))
+                    || (m.Manufacturer != null && m.Manufacturer.Contains(search)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                query = query.Where(m => m.Category == category);
+            }
+
+            if (string.Equals(status, "LowStock", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(m => m.Batches.Sum(b => b.Quantity) > 0 && m.Batches.Sum(b => b.Quantity) <= m.ReorderLevel);
+            }
+            else if (string.Equals(status, "OutOfStock", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(m => m.Batches.Sum(b => b.Quantity) <= 0);
+            }
+            else if (string.Equals(status, "Optimal", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(m => m.Batches.Sum(b => b.Quantity) > m.ReorderLevel);
+            }
 
             ViewBag.TotalCountAll = await query.CountAsync();
             ViewBag.TotalUnitsAll = await query.SelectMany(m => m.Batches).SumAsync(b => (int?)b.Quantity) ?? 0;
@@ -31,17 +56,58 @@ namespace CarePlusPharmacy.Controllers
             ViewBag.Search = search;
             ViewBag.CanEdit = CanEdit;
 
+            var categories = await _context.Medicines.Select(m => m.Category).Distinct().OrderBy(c => c).ToListAsync();
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search brand, generic, manufacturer", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "category", Label = "Category", Type = Models.ViewModels.FilterFieldType.Select, Value = category,
+                    Options = categories.Select(c => new Models.ViewModels.FilterOption { Value = c, Label = c }).ToList() },
+                new() { Name = "status", Label = "Stock Status", Type = Models.ViewModels.FilterFieldType.Select, Value = status,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Optimal", Label = "Optimal" },
+                        new() { Value = "LowStock", Label = "Low Stock" },
+                        new() { Value = "OutOfStock", Label = "Out of Stock" }
+                    } }
+            };
+
             var medicines = await PaginatedList<Medicine>.CreateAsync(query.OrderBy(m => m.Name), page, pageSize);
             return View(medicines);
         }
 
         // Expiry Monitoring — tracks batch-level expiration dates and financial risk
-        public async Task<IActionResult> Expiring(string? tab, int page = 1, int pageSize = 10, bool print = false)
+        public async Task<IActionResult> Expiring(string? tab, string? search, string? category, DateTime? from, DateTime? to, int page = 1, int pageSize = 10, bool print = false)
         {
             tab = string.IsNullOrWhiteSpace(tab) ? "all" : tab.ToLower();
             var today = DateTime.Today;
 
             var baseQuery = _context.MedicineBatches.Include(b => b.Medicine).AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim();
+                baseQuery = baseQuery.Where(b =>
+                    (b.Medicine != null && b.Medicine.Name.Contains(search))
+                    || (b.Medicine != null && b.Medicine.GenericName != null && b.Medicine.GenericName.Contains(search))
+                    || b.BatchNumber.Contains(search));
+            }
+
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                baseQuery = baseQuery.Where(b => b.Medicine != null && b.Medicine.Category == category);
+            }
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.Date;
+                baseQuery = baseQuery.Where(b => b.ExpiryDate >= fromDate);
+            }
+
+            if (to.HasValue)
+            {
+                var toDate = to.Value.Date.AddDays(1);
+                baseQuery = baseQuery.Where(b => b.ExpiryDate < toDate);
+            }
 
             // Compute counts and valuations for ALL tabs over full scoped dataset
             ViewBag.TotalCountAll = await baseQuery.CountAsync();
@@ -74,6 +140,16 @@ namespace CarePlusPharmacy.Controllers
 
             ViewBag.CurrentTab = tab;
             ViewBag.Print = print;
+
+            var categories = await _context.Medicines.Select(m => m.Category).Distinct().OrderBy(c => c).ToListAsync();
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search medicine or batch #", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "category", Label = "Category", Type = Models.ViewModels.FilterFieldType.Select, Value = category,
+                    Options = categories.Select(c => new Models.ViewModels.FilterOption { Value = c, Label = c }).ToList() },
+                new() { Name = "from", Label = "Expiry From", Type = Models.ViewModels.FilterFieldType.Date, Value = from?.ToString("yyyy-MM-dd") },
+                new() { Name = "to", Label = "Expiry To", Type = Models.ViewModels.FilterFieldType.Date, Value = to?.ToString("yyyy-MM-dd") }
+            };
 
             if (print)
             {

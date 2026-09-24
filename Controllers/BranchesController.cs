@@ -16,12 +16,43 @@ namespace CarePlusPharmacy.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? type, int page = 1, int pageSize = 10)
         {
-            var query = _context.Branches
-                .OrderByDescending(b => b.IsMainBranch)
-                .ThenBy(b => b.Name);
-            var branches = await PaginatedList<Branch>.CreateAsync(query, page, pageSize);
+            var query = _context.Branches.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim();
+                query = query.Where(b =>
+                    b.Name.Contains(search)
+                    || b.Address.Contains(search)
+                    || b.Phone.Contains(search));
+            }
+
+            if (string.Equals(type, "Main", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(b => b.IsMainBranch);
+            }
+            else if (string.Equals(type, "Subsidiary", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(b => !b.IsMainBranch);
+            }
+
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search name, address, or phone", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "type", Label = "Branch Type", Type = Models.ViewModels.FilterFieldType.Select, Value = type,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Main", Label = "Main Branch" },
+                        new() { Value = "Subsidiary", Label = "Subsidiary" }
+                    } }
+            };
+
+            var branches = await PaginatedList<Branch>.CreateAsync(
+                query.OrderByDescending(b => b.IsMainBranch).ThenBy(b => b.Name),
+                page,
+                pageSize);
             return View(branches);
         }
 

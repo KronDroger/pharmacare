@@ -1,6 +1,8 @@
 @model CarePlusPharmacy.Models.PaginatedList<Branch>
 @{ ViewData["Title"] = "Branches"; }
 
+@await Html.PartialAsync("_FilterBar")
+
 <div class="table-card">
     <div class="table-card-header">
         <div>

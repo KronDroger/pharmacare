@@ -20,13 +20,53 @@ namespace CarePlusPharmacy.Controllers
             _userManager = userManager;
         }
 
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(string? search, string? status, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
         {
             var baseQuery = _context.Prescriptions.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim();
+                baseQuery = baseQuery.Where(p =>
+                    (p.Customer != null && p.Customer.FullName.Contains(search))
+                    || p.DoctorName.Contains(search)
+                    || p.Details.Any(d => d.Medicine != null && d.Medicine.Name.Contains(search)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<PrescriptionStatus>(status, true, out var prescriptionStatus))
+            {
+                baseQuery = baseQuery.Where(p => p.Status == prescriptionStatus);
+            }
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.Date;
+                baseQuery = baseQuery.Where(p => p.DatePrescribed >= fromDate);
+            }
+
+            if (to.HasValue)
+            {
+                var toDate = to.Value.Date.AddDays(1);
+                baseQuery = baseQuery.Where(p => p.DatePrescribed < toDate);
+            }
 
             ViewBag.TotalCountAll = await baseQuery.CountAsync();
             ViewBag.PendingCountAll = await baseQuery.CountAsync(p => p.Status == PrescriptionStatus.Pending);
             ViewBag.FulfilledCountAll = await baseQuery.CountAsync(p => p.Status == PrescriptionStatus.Fulfilled);
+
+            ViewBag.Filters = new List<Models.ViewModels.FilterField>
+            {
+                new() { Name = "search", Label = "Search patient, doctor, or medicine", Type = Models.ViewModels.FilterFieldType.Text, Value = search },
+                new() { Name = "status", Label = "Fulfillment Status", Type = Models.ViewModels.FilterFieldType.Select, Value = status,
+                    Options = new List<Models.ViewModels.FilterOption>
+                    {
+                        new() { Value = "Pending", Label = "Pending" },
+                        new() { Value = "Fulfilled", Label = "Fulfilled" },
+                        new() { Value = "Cancelled", Label = "Cancelled" }
+                    } },
+                new() { Name = "from", Label = "From", Type = Models.ViewModels.FilterFieldType.Date, Value = from?.ToString("yyyy-MM-dd") },
+                new() { Name = "to", Label = "To", Type = Models.ViewModels.FilterFieldType.Date, Value = to?.ToString("yyyy-MM-dd") }
+            };
 
             var query = baseQuery
                 .Include(p => p.Customer)
