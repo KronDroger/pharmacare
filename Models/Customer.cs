@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CarePlusPharmacy.Models
 {
@@ -38,6 +39,7 @@ namespace CarePlusPharmacy.Models
 
         public ICollection<Sale> Sales { get; set; } = new List<Sale>();
         public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
+        public ICollection<CustomerMembership> Memberships { get; set; } = new List<CustomerMembership>();
 
         [Display(Name = "CRM Tier")]
         public string Tier => LoyaltyPoints switch
@@ -47,5 +49,14 @@ namespace CarePlusPharmacy.Models
             >= 100 => "Silver Member",
             _ => "Bronze Member"
         };
+
+        // The currently enrolled paid membership (most recent Active record), or
+        // null when the customer has none. Not persisted - computed from Memberships.
+        [NotMapped]
+        public CustomerMembership? CurrentMembership
+            => Memberships?
+                .Where(m => m.Status == MembershipStatus.Active)
+                .OrderByDescending(m => m.StartDate)
+                .FirstOrDefault();
     }
 }

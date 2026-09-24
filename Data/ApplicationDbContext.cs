@@ -28,6 +28,8 @@ namespace CarePlusPharmacy.Data
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
         public DbSet<CustomerSubscription> CustomerSubscriptions { get; set; }
         public DbSet<Branch> Branches { get; set; }
+        public DbSet<MembershipTier> MembershipTiers { get; set; }
+        public DbSet<CustomerMembership> CustomerMemberships { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -148,6 +150,19 @@ namespace CarePlusPharmacy.Data
                 .WithMany()
                 .HasForeignKey(u => u.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Paid membership tiers (distinct from per-medicine SubscriptionPlans).
+            builder.Entity<CustomerMembership>()
+                .HasOne(m => m.Customer)
+                .WithMany(c => c.Memberships)
+                .HasForeignKey(m => m.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<CustomerMembership>()
+                .HasOne(m => m.MembershipTier)
+                .WithMany(t => t.Memberships)
+                .HasForeignKey(m => m.MembershipTierId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Email is unique per patient profile (nullable-safe: NULLs are unlimited).
             // Existing duplicates were resolved in the migration before the index is created.

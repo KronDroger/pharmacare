@@ -214,6 +214,7 @@ namespace CarePlusPharmacy.Data
             await EnsureVatExemptMedicinesAsync(context);
             await EnsureRxRequiredMedicinesAsync(context);
             await EnsurePurchaseOrderDataAsync(context);
+            await EnsureMembershipTiersAsync(context);
 
             // ---- 5. Link demo accounts to their Customer records ----
             // The portal resolves patients via ApplicationUser.CustomerId, so the demo
@@ -358,6 +359,50 @@ namespace CarePlusPharmacy.Data
 
             if (samplePos.Count == 0) return;
             context.PurchaseOrders.AddRange(samplePos);
+            await context.SaveChangesAsync();
+        }
+
+        // Seed the demo membership tiers (idempotent) — the pricing/programs the
+        // portal sells and POS applies as the prevailing customer discount.
+        private static async Task EnsureMembershipTiersAsync(ApplicationDbContext context)
+        {
+            if (await context.MembershipTiers.AnyAsync()) return;
+
+            context.MembershipTiers.AddRange(
+                new MembershipTier
+                {
+                    Name = "Basic",
+                    MonthlyPrice = 0.00m,
+                    DiscountPercent = 0m,
+                    FreeDelivery = false,
+                    MaxFamilyAccounts = 1,
+                    HasDedicatedPharmacist = false,
+                    PriorityDispensing = false,
+                    IsActive = true
+                },
+                new MembershipTier
+                {
+                    Name = "Health Plus VIP",
+                    MonthlyPrice = 12.99m,
+                    DiscountPercent = 15m,
+                    FreeDelivery = true,
+                    MaxFamilyAccounts = 1,
+                    HasDedicatedPharmacist = false,
+                    PriorityDispensing = true,
+                    IsActive = true
+                },
+                new MembershipTier
+                {
+                    Name = "Family/Chronic",
+                    MonthlyPrice = 22.99m,
+                    DiscountPercent = 15m,
+                    FreeDelivery = true,
+                    MaxFamilyAccounts = 5,
+                    HasDedicatedPharmacist = true,
+                    PriorityDispensing = true,
+                    IsActive = true
+                }
+            );
             await context.SaveChangesAsync();
         }
 

@@ -144,3 +144,11 @@
 
 - [x] Verified live: `dotnet build` 0 warn/err → ran `--launch-profile http` (localhost:5000) → auto-login via decoded `captchaToken` → `/PurchaseOrders?pageSize=100` total = **8**; narrowing `status=Received` → **3**, `status=Pending` → **4**, `status=Cancelled` → **1**, `search=MediSource` → **3**, `from=2026-08-01&to=2026-09-10` → **3**, `from=2026-09-11&to=2026-09-30` → **5**; filter bar (search/status/from/to) renders; restarted the app and the total stayed **8** (idempotent — no duplicate rows); app stopped
 - [x] Committed separately
+
+## Phase 18: Membership Tiers (paid plans) — Phase 1 of 5: Data Model (done)
+- [x] `Models/MembershipTier.cs` (new): Name, MonthlyPrice (decimal(10,2)), DiscountPercent (decimal(5,2)), FreeDelivery, MaxFamilyAccounts (default 1), HasDedicatedPharmacist, PriorityDispensing, IsActive
+- [x] `Models/CustomerMembership.cs` (new): CustomerId FK, MembershipTierId FK, StartDate, NextBillingDate, `MembershipStatus { Active, Paused, Cancelled }`, PaymentMethod
+- [x] `Models/Customer.cs`: `[NotMapped] CurrentMembership` helper (most recent Active membership) + `Memberships` collection
+- [x] `ApplicationDbContext`: `MembershipTiers` / `CustomerMemberships` DbSets + FK config (Customer → cascade, Tier → restrict)
+- [x] `DbInitializer`: idempotent `EnsureMembershipTiersAsync` seeding Basic (₱0/0%), Health Plus VIP (₱12.99/15%, free delivery, priority dispensing) and Family/Chronic (₱22.99/15%, all VIP perks + MaxFamilyAccounts=5 + dedicated pharmacist)
+- [x] Migration `20260924152456_AddMembershipTiers` applied cleanly; DB verified: 3 tiers seeded exactly to spec; no controller/UI yet
