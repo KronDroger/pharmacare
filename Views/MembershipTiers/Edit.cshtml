@@ -1,0 +1,20 @@
+@model MembershipTier
+@{ ViewData["Title"] = "Edit Membership Tier"; }
+<div class="table-card p-4" style="max-width:560px;">
+    <form asp-action="Edit" method="post">
+        <input type="hidden" asp-for="Id" />
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+        <div class="mb-3"><label class="form-label">Tier name</label><input asp-for="Name" class="form-control" required /></div>
+        <div class="row g-3">
+            <div class="col-md-6 mb-3"><label class="form-label">Monthly price (₱)</label><input asp-for="MonthlyPrice" class="form-control num" type="number" step="0.01" min="0" required /></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Discount percent</label><input asp-for="DiscountPercent" class="form-control num" type="number" step="0.01" min="0" max="100" required /></div>
+        </div>
+        <div class="mb-3"><label class="form-label">Max family accounts</label><input asp-for="MaxFamilyAccounts" class="form-control num" type="number" min="1" required /></div>
+        <div class="form-check form-switch mb-2"><input asp-for="FreeDelivery" class="form-check-input" /><label class="form-check-label">Free delivery included</label></div>
+        <div class="form-check form-switch mb-2"><input asp-for="PriorityDispensing" class="form-check-input" /><label class="form-check-label">Priority dispensing</label></div>
+        <div class="form-check form-switch mb-2"><input asp-for="HasDedicatedPharmacist" class="form-check-input" /><label class="form-check-label">Dedicated pharmacist</label></div>
+        <div class="form-check form-switch mb-3"><input asp-for="IsActive" class="form-check-input" /><label class="form-check-label">Active (available for signup)</label></div>
+        <button type="submit" class="btn btn-accent">Save Changes</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>

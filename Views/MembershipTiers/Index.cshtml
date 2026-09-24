@@ -1,0 +1,42 @@
+@model IEnumerable<MembershipTier>
+@{ ViewData["Title"] = "Membership Tiers"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <p class="text-muted mb-0">Paid customer programs sold on the portal (discount %, free delivery, premium perks).</p>
+    <a asp-action="Create" class="btn btn-accent"><i class="bi bi-plus-lg"></i> Add Tier</a>
+</div>
+
+<div class="table-card">
+    <table class="table align-middle mb-0">
+        <thead>
+            <tr><th>Tier</th><th class="num">Monthly Price</th><th class="num">Discount</th><th>Perks</th><th>Status</th><th class="num">Enrolled</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any()) { <tr><td colspan="7" class="text-center text-muted py-4">No membership tiers yet.</td></tr> }
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td class="fw-semibold">@t.Name</td>
+                    <td class="num">₱@t.MonthlyPrice.ToString("N2")</td>
+                    <td class="num">@t.DiscountPercent.ToString("0.##")%</td>
+                    <td>
+                        @if (t.FreeDelivery) { <span class="badge text-bg-success">Free Delivery</span> }
+                        @if (t.PriorityDispensing) { <span class="badge text-bg-primary">Priority</span> }
+                        @if (t.HasDedicatedPharmacist) { <span class="badge text-bg-warning">Dedicated Pharmacist</span> }
+                        @if (t.MaxFamilyAccounts > 1) { <span class="badge text-bg-info">Family: @t.MaxFamilyAccounts</span> }
+                        @if (!t.FreeDelivery && !t.PriorityDispensing && !t.HasDedicatedPharmacist && t.MaxFamilyAccounts <= 1) { <span class="text-muted">—</span> }
+                    </td>
+                    <td>
+                        @if (t.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="num">@t.Memberships.Count</td>
+                    <td>
+                        <a asp-action="Edit" asp-route-id="@t.Id" class="action-icon text-secondary me-2" title="Edit Tier"><i class="bi bi-pencil"></i></a>
+                        <a asp-action="Delete" asp-route-id="@t.Id" class="action-icon text-danger" title="Delete Tier"><i class="bi bi-trash"></i></a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

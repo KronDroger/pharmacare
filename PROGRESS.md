@@ -152,3 +152,9 @@
 - [x] `ApplicationDbContext`: `MembershipTiers` / `CustomerMemberships` DbSets + FK config (Customer → cascade, Tier → restrict)
 - [x] `DbInitializer`: idempotent `EnsureMembershipTiersAsync` seeding Basic (₱0/0%), Health Plus VIP (₱12.99/15%, free delivery, priority dispensing) and Family/Chronic (₱22.99/15%, all VIP perks + MaxFamilyAccounts=5 + dedicated pharmacist)
 - [x] Migration `20260924152456_AddMembershipTiers` applied cleanly; DB verified: 3 tiers seeded exactly to spec; no controller/UI yet
+
+## Phase 19: Membership Tiers (paid plans) — Phase 2 of 5: Admin CRUD (done)
+- [x] `Controllers/MembershipTiersController.cs` (new, `[Authorize(Roles="Admin")]`): Index (Include Memberships, ordered by MonthlyPrice then Name), Create, Edit, Delete + audit log entries `TIER_CREATED` / `TIER_UPDATED` / `TIER_DELETED`; Delete blocked with `TempData["Error"]` when memberships exist
+- [x] `Views/MembershipTiers/Index.cshtml`, `Create.cshtml`, `Edit.cshtml`, `Delete.cshtml` (new): table-card / btn-accent / form-switch style, perk badges (Free Delivery / Priority / Dedicated Pharmacist / Family:N), status badge, enrolled count, delete confirm with in-page guard for enrolled tiers
+- [x] `Views/Shared/_Layout.cshtml`: "Membership Tiers" nav link added in the Admin CRM & Patients block (next to Subscription Plans)
+- [x] Verified live as Admin: 3 seeded tiers listed, create → edit → delete cycle works (18/18 automated checks incl. pharmacist blocked → `Account/AccessDenied`); build 0 warn / 0 err; commit `457132b` for Phase 1, Phase 2 committed next

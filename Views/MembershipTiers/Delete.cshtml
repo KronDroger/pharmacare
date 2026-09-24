@@ -1,0 +1,19 @@
+@model MembershipTier
+@{ ViewData["Title"] = "Delete Membership Tier"; }
+<div class="table-card p-4" style="max-width:520px;">
+    <p>Are you sure you want to delete <strong>@Model.Name</strong>?</p>
+    <ul class="text-muted small mb-3">
+        <li>Monthly price: <strong>₱@Model.MonthlyPrice.ToString("N2")</strong></li>
+        <li>Discount: <strong>@Model.DiscountPercent.ToString("0.##")%</strong></li>
+        <li>Enrolled customers: <strong>@Model.Memberships.Count</strong></li>
+    </ul>
+    @if (Model.Memberships.Any())
+    {
+        <div class="alert alert-warning">This tier has active enrollments and cannot be deleted — edit it (e.g. set inactive) instead.</div>
+    }
+    <form asp-action="Delete" method="post">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger" @(Model.Memberships.Any() ? "disabled" : "")>Delete</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
