@@ -204,3 +204,23 @@
 - [x] The muted free card's button used `btn-outline-secondary` (grey text/border) on top of a whole-card `opacity:.6`, making "Current Plan -- Free" nearly invisible in light mode.
 - [x] `Views/Portal/Membership.cshtml`: swapped the button to solid **`btn-secondary`** (dark grey bg, white text) and raised the muted card opacity `.6` -> **`.75`** so the label stays clearly legible while the card still reads as the greyed-out/current free plan. Paid "Current Plan" button and Subscribe forms unchanged.
 - [x] Verified live (14/14 harness PASS + rendered-HTML spot checks: `btn w-100 btn-secondary`, `opacity:.75`, `Current Plan &#x2014; Free` all present); membership baseline reset (0 active), canonical tiers active, build 0 warn / 0 err.
+
+## Phase 27: Membership UI redesign & payment confirmation flow (done)
+- [x] `Views/Portal/Membership.cshtml`: Redesigned customer-facing membership browse page adapted to CarePlus design tokens (`var(--cp-forest)`, `var(--cp-mint)`, `var(--cp-accent)`, `var(--cp-surface)`, dark-mode safe):
+  - Top pill badge: `"No Lock-in, Cancel Anytime"`.
+  - Header: `"Choose Your Membership"` + reassuring subtitle.
+  - Card layout: circular icon badge, "Most Popular" ribbon badge on recommended tier (`Health Plus VIP`), tier name, concise description, large bold monthly price with plain honest pricing (no fake strikethroughs).
+  - Perks checklist: cleanly extracted from model fields (`DiscountPercent`, `FreeDelivery`, `PriorityDispensing`, `HasDedicatedPharmacist`, `MaxFamilyAccounts`).
+  - Preserved disabled "Current Plan -- Free" (opacity .75, solid secondary) and "Current Plan" states without regression.
+  - Footer card: honest, friendly welcome notice for pharmacy context (*"New Members Are Always Welcome"*).
+  - Membership history table preserved with theme tokens.
+- [x] `Views/Portal/SubscribeConfirm.cshtml`: New confirmation page for paid tiers (`GET /Portal/SubscribeConfirm/{id}`), displaying plan summary, included perks, fee breakdown, and payment method button group (`Cash`, `GCash`, `Card`, `PayMongo`) matching `Views/Sales/Create.cshtml`.
+- [x] `Controllers/PortalController.cs`:
+  - Added `SubscribeConfirm(int id)` action for paid membership checkout.
+  - Updated `Subscribe(int id, string? paymentMethod)` POST action:
+    - Free tier skips payment and subscribes directly.
+    - Paid tier creates `CustomerMembership` with actual chosen `PaymentMethod` (replacing hardcoded "Portal" string).
+    - Concurrently creates a matching `Sale` and `Billing` record (`InvoiceNumber = MBR-YYYY-XXXXX`, `DateIssued = today`, `PaymentStatus = Paid`, `PaymentMethod` as selected) within a single database transaction.
+- [x] `Views/Billing/Details.cshtml`: Added line-item fallback for membership invoices when `Sale.Details` is empty so official invoices render cleanly.
+- [x] Build verified clean (`dotnet build`: 0 warnings, 0 errors). Changes committed in `67dfdf4`.
+
