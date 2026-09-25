@@ -1,0 +1,160 @@
+@model CarePlusPharmacy.Models.MembershipTier
+@{
+    ViewData["Title"] = $"Confirm Membership - {Model.Name}";
+    var current = ViewBag.CurrentMembership as CarePlusPharmacy.Models.CustomerMembership;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7 col-md-9">
+        <div class="mb-3">
+            <a asp-action="Membership" class="text-decoration-none text-muted small fw-semibold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Membership Plans
+            </a>
+        </div>
+
+        <div class="table-card p-4">
+            <div class="d-flex align-items-center gap-3 pb-3 mb-4 border-bottom" style="border-color: var(--cp-border) !important;">
+                <div class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                     style="width: 48px; height: 48px; background: var(--cp-mint-subtle); color: var(--cp-forest); font-size: 22px;">
+                    <i class="bi bi-patch-check-fill text-success"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-1" style="color: var(--cp-forest-deep);">Confirm Membership Enrollment</h5>
+                    <div class="text-muted small">Review your chosen plan and select your payment method to activate.</div>
+                </div>
+            </div>
+
+            <!-- Tier Summary Card -->
+            <div class="p-3 rounded mb-4" style="background: var(--cp-surface-elevated); border: 1px solid var(--cp-border);">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <span class="badge mb-2" style="background: var(--cp-mint-subtle); color: var(--cp-forest); border: 1px solid rgba(16,185,129,0.3); font-size: 11px;">
+                            Selected Plan
+                        </span>
+                        <h4 class="fw-bold mb-0" style="color: var(--cp-forest-deep);">@Model.Name</h4>
+                    </div>
+                    <div class="text-end">
+                        <div class="fs-4 fw-bold text-success font-monospace">₱@Model.MonthlyPrice.ToString("N2")</div>
+                        <div class="text-muted small">per month</div>
+                    </div>
+                </div>
+
+                <div class="pt-3 mt-3 border-top" style="border-color: var(--cp-border) !important;">
+                    <div class="text-muted fw-bold mb-2" style="font-size: 11.5px; letter-spacing: 0.5px; text-transform: uppercase;">Included Plan Perks</div>
+                    <div class="row g-2">
+                        @if (Model.DiscountPercent > 0)
+                        {
+                            <div class="col-sm-6">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span><strong>@Model.DiscountPercent.ToString("0.##")% discount</strong> on all purchases</span>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.FreeDelivery)
+                        {
+                            <div class="col-sm-6">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span><strong>Free door-to-door delivery</strong></span>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.PriorityDispensing)
+                        {
+                            <div class="col-sm-6">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span><strong>Priority dispensing</strong> counter</span>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.HasDedicatedPharmacist)
+                        {
+                            <div class="col-sm-6">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span><strong>Dedicated personal pharmacist</strong></span>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.MaxFamilyAccounts > 1)
+                        {
+                            <div class="col-sm-6">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span>Up to <strong>@Model.MaxFamilyAccounts family member accounts</strong></span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (current != null)
+            {
+                <div class="alert mb-4" style="background-color: var(--cp-info-bg); color: var(--cp-info); border: 1px solid rgba(2,132,199,0.25); font-size: 13px;">
+                    <i class="bi bi-info-circle me-1"></i> You are currently subscribed to <strong>@current.MembershipTier?.Name</strong>. Confirming will switch your plan immediately.
+                </div>
+            }
+
+            <form asp-action="Subscribe" asp-route-id="@Model.Id" method="post" id="subscribeConfirmForm">
+                @Html.AntiForgeryToken()
+
+                <!-- Payment Method Select (Matching Views/Sales/Create.cshtml style) -->
+                <div class="mb-4">
+                    <label class="form-label mb-2 fw-bold text-muted" style="font-size: 11px; letter-spacing: 0.5px;">SELECT PAYMENT METHOD</label>
+                    <div class="btn-group w-100" role="group" aria-label="Payment method">
+                        <input type="radio" class="btn-check" name="paymentMethod" id="payCash" value="Cash" checked />
+                        <label class="btn btn-outline-secondary btn-sm py-2" for="payCash">
+                            <i class="bi bi-cash me-1"></i> Cash
+                        </label>
+
+                        <input type="radio" class="btn-check" name="paymentMethod" id="payGCash" value="GCash" />
+                        <label class="btn btn-outline-secondary btn-sm py-2" for="payGCash">
+                            <i class="bi bi-phone me-1"></i> GCash
+                        </label>
+
+                        <input type="radio" class="btn-check" name="paymentMethod" id="payCard" value="Card" />
+                        <label class="btn btn-outline-secondary btn-sm py-2" for="payCard">
+                            <i class="bi bi-credit-card me-1"></i> Card
+                        </label>
+
+                        <input type="radio" class="btn-check" name="paymentMethod" id="payMongo" value="PayMongo" />
+                        <label class="btn btn-outline-secondary btn-sm py-2" for="payMongo">
+                            <i class="bi bi-shield-check me-1"></i> PayMongo
+                        </label>
+                    </div>
+                    <div class="text-muted mt-2" style="font-size: 11.5px;">
+                        <i class="bi bi-shield-lock me-1 text-success"></i> An official billing invoice will be generated and marked paid for your records.
+                    </div>
+                </div>
+
+                <!-- Price Breakdown & Terms -->
+                <div class="rounded p-3 mb-4" style="background: var(--cp-surface-elevated); border: 1px dashed var(--cp-border);">
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span class="text-muted">Subscription Charge (1st Month)</span>
+                        <span class="fw-semibold">₱@Model.MonthlyPrice.ToString("N2")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span class="text-muted">Setup &amp; Enrollment Fee</span>
+                        <span class="text-success fw-semibold">₱0.00 (Free)</span>
+                    </div>
+                    <div class="d-flex justify-content-between pt-2 border-top fw-bold fs-6" style="border-color: var(--cp-border) !important; color: var(--cp-forest-deep);">
+                        <span>Total Payable Today</span>
+                        <span class="text-success">₱@Model.MonthlyPrice.ToString("N2")</span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a asp-action="Membership" class="btn btn-outline-secondary flex-fill py-2">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-careplus flex-fill py-2 fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i> Confirm &amp; Pay ₱@Model.MonthlyPrice.ToString("N2")
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

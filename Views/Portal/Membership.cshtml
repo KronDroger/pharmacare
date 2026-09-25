@@ -1,142 +1,308 @@
 @model PortalMembershipViewModel
-@{ ViewData["Title"] = "My Membership"; }
+@{
+    ViewData["Title"] = "My Membership";
+    var cur = Model.CurrentMembership;
+    var freeTier = Model.Tiers.FirstOrDefault(t => t.MonthlyPrice == 0);
+    var currentTierId = cur?.MembershipTierId ?? freeTier?.Id;
+}
 
 @if (Model.Customer == null)
 {
     <div class="table-card p-5 text-center text-muted">
+        <i class="bi bi-person-x fs-1 text-muted d-block mb-3"></i>
         No patient profile is linked to your account yet. Ask the pharmacy to link your account so you can use the portal.
     </div>
     return;
 }
 
-@{
-    var cur = Model.CurrentMembership;
-    var freeTier = Model.Tiers.FirstOrDefault(t => t.MonthlyPrice == 0);
-    var currentTierId = cur?.MembershipTierId ?? freeTier?.Id;
-    string PerksRow(CarePlusPharmacy.Models.MembershipTier t)
-    {
-        var s = "";
-        if (t.FreeDelivery) s += "<span class=\"badge text-bg-success\">Free Delivery</span> ";
-        if (t.PriorityDispensing) s += "<span class=\"badge text-bg-primary\">Priority</span> ";
-        if (t.HasDedicatedPharmacist) s += "<span class=\"badge text-bg-warning\">Dedicated Pharmacist</span> ";
-        if (t.MaxFamilyAccounts > 1) s += "<span class=\"badge text-bg-info\">Family: " + t.MaxFamilyAccounts + "</span> ";
-        if (s == "") s = "<span class=\"text-muted\">—</span>";
-        return s;
-    }
-}
-
-<div class="table-card">
-    <div class="table-card-header">
-        <div>
-            <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-patch-check-fill text-success me-2"></i>My Membership</div>
-            <div class="text-muted" style="font-size: 12px;">Enroll in a paid membership for a discount, free delivery and premium perks</div>
-        </div>
-        @if (cur != null)
-        {
-            <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 13px; padding: 6px 12px;">
-                <i class="bi bi-check-circle"></i> @cur.MembershipTier?.Name Active
-            </span>
-        }
-    </div>
-
-    @if (cur != null)
-    {
-        <div class="p-3">
-            <div class="border rounded p-3" style="border-color: var(--cp-success-border, #cfe6d8) !important;">
-                <div class="row g-3 align-items-center">
-                    <div class="col-md-7">
-                        <div class="fw-bold fs-5" style="color: var(--cp-forest-deep);">@cur.MembershipTier?.Name</div>
-                        <div class="text-muted" style="font-size: 12.5px;">₱@(cur.MembershipTier?.MonthlyPrice.ToString("N2")) / month · @(cur.MembershipTier?.DiscountPercent.ToString("0.##"))% off</div>
-                        <div class="mt-1">@Html.Raw(PerksRow(cur.MembershipTier!))</div>
-                        <div class="text-muted mt-1" style="font-size: 12.5px;">Active since <strong>@cur.StartDate.ToString("yyyy-MM-dd")</strong> · Next billing <strong>@cur.NextBillingDate.ToString("yyyy-MM-dd")</strong></div>
+<!-- Active Membership Banner (if active) -->
+@if (cur != null)
+{
+    <div class="table-card mb-4" style="border-left: 4px solid var(--cp-accent);">
+        <div class="p-3 p-md-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 12px; padding: 5px 10px;">
+                            <i class="bi bi-check-circle-fill me-1"></i> Active Plan
+                        </span>
+                        <span class="text-muted small">· Enrolled since @cur.StartDate.ToString("MMM dd, yyyy")</span>
                     </div>
-                    <div class="col-md-5 text-md-end">
-                        <form asp-action="CancelMembership" asp-route-id="@cur.Id" method="post" class="d-inline" onsubmit="return confirm('Cancel your membership? You will lose your membership benefits.');">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Cancel Membership</button>
-                        </form>
+                    <div class="fw-bold fs-4" style="color: var(--cp-forest-deep);">@cur.MembershipTier?.Name</div>
+                    <div class="text-muted small mt-1">
+                        ₱@(cur.MembershipTier?.MonthlyPrice.ToString("N2")) / month · @(cur.MembershipTier?.DiscountPercent.ToString("0.##"))% member discount on every order
                     </div>
+                    <div class="text-muted small mt-1">
+                        <i class="bi bi-calendar-event me-1 text-success"></i> Next scheduled renewal: <strong>@cur.NextBillingDate.ToString("MMMM dd, yyyy")</strong>
+                        · Paid via <strong class="badge bg-secondary-subtle text-secondary">@cur.PaymentMethod</strong>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <form asp-action="CancelMembership" asp-route-id="@cur.Id" method="post" class="d-inline" onsubmit="return confirm('Cancel your membership? You will lose your membership perks at the end of the current period.');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-danger px-3 py-2">
+                            <i class="bi bi-x-circle me-1"></i> Cancel Membership
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
-    }
-    else
-    {
-        <div class="p-3">
-            <div class="alert" style="background-color: var(--cp-warning-bg, #fff4d6); color: #8a6d1d; margin-bottom: 0;">
-                You don't have an active membership yet. Pick a tier below to start enjoying member benefits.
-            </div>
-        </div>
-    }
+    </div>
+}
+
+<!-- Header Section Inspired by Reference -->
+<div class="text-center py-4 mb-3">
+    <!-- 1. Small Pill Badge -->
+    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-3"
+         style="background: var(--cp-mint-subtle); color: var(--cp-forest); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 12.5px; font-weight: 600;">
+        <i class="bi bi-shield-check text-success"></i>
+        <span>No Lock-in, Cancel Anytime</span>
+    </div>
+
+    <!-- 2. Bold Heading + One-line Subheading -->
+    <h2 class="fw-bold mb-2" style="color: var(--cp-forest-deep); letter-spacing: -0.5px;">Choose Your Membership</h2>
+    <p class="text-muted mx-auto mb-0" style="max-width: 580px; font-size: 14.5px;">
+        A smart, health-first investment for you and your family with exclusive pharmacy savings and personalized care.
+    </p>
 </div>
 
-<div class="row g-3 mt-0">
+<!-- 3. Tier Cards Grid -->
+<div class="row g-4 justify-content-center mb-5">
     @if (!Model.Tiers.Any())
     {
-        <div class="col-12 text-center text-muted py-5">No membership tiers are available right now.</div>
+        <div class="col-12 text-center text-muted py-5">No membership tiers are currently active.</div>
     }
+
     @foreach (var t in Model.Tiers)
     {
         var isCurrent = t.Id == currentTierId;
         var isCurrentFree = isCurrent && cur == null && freeTier != null && t.Id == freeTier.Id;
-        var cardStyle = "border:1px solid #dee2e6;" + (isCurrentFree ? " opacity:.75;" : "");
-        <div class="col-md-4">
-            <div class="border rounded table-card h-100 d-flex flex-column" style="@cardStyle">
-                <div class="p-3 pb-2">
-                    <div class="fw-bold" style="color: var(--cp-forest-deep);">@t.Name @if (isCurrentFree) { <span class="badge bg-secondary ms-1">Free</span> }</div>
-                    <div class="fs-4 fw-bold text-success mt-1">₱@t.MonthlyPrice.ToString("N2") <span class="fs-6 text-muted fw-normal">/ month</span></div>
-                    <div class="text-muted" style="font-size: 12.5px;">@t.DiscountPercent.ToString("0.##")% off on every purchase</div>
+        var isPopular = t.Name.Contains("Health Plus VIP") || t.Name.Contains("VIP") || (!t.Name.Contains("Basic") && t.MonthlyPrice > 0 && t.MonthlyPrice < 20);
+        
+        // Distinct subtle highlight for Most Popular card
+        var cardBorder = isPopular 
+            ? "border: 2px solid var(--cp-accent);" 
+            : "border: 1px solid var(--cp-border);";
+        var cardBg = isPopular
+            ? "background: var(--cp-surface-elevated);"
+            : "background: var(--cp-surface);";
+
+        // Collect Perks
+        var perkList = new List<string>();
+        if (t.DiscountPercent > 0)
+        {
+            perkList.Add($"{t.DiscountPercent:0.##}% discount on all medicines & items");
+        }
+        else
+        {
+            perkList.Add("Standard retail pricing");
+        }
+
+        if (t.FreeDelivery)
+        {
+            perkList.Add("Free door-to-door medicine delivery");
+        }
+        else
+        {
+            perkList.Add("Standard branch delivery rates apply");
+        }
+
+        if (t.PriorityDispensing)
+        {
+            perkList.Add("Priority fast-track dispensing counter");
+        }
+
+        if (t.HasDedicatedPharmacist)
+        {
+            perkList.Add("Dedicated licensed personal pharmacist");
+        }
+
+        if (t.MaxFamilyAccounts > 1)
+        {
+            perkList.Add($"Share benefits across up to {t.MaxFamilyAccounts} family accounts");
+        }
+        else
+        {
+            perkList.Add("Individual patient account coverage");
+        }
+
+        // Short one-line description tailored per tier
+        string description = t.MonthlyPrice == 0
+            ? "Essential pharmacy access with loyalty rewards for everyday visits."
+            : (t.MaxFamilyAccounts > 1
+                ? "Full comprehensive coverage and dedicated support for the whole family."
+                : "Our best value tier for individual chronic care and maximum pharmacy savings.");
+
+        // Icon for tier
+        string iconClass = t.MonthlyPrice == 0
+            ? "bi-heart"
+            : (t.MaxFamilyAccounts > 1 ? "bi-people-fill" : "bi-lightning-charge-fill");
+
+        <div class="col-lg-4 col-md-6">
+            <div class="rounded-4 h-100 d-flex flex-column position-relative shadow-sm transition-hover" 
+                 style="@cardBorder @cardBg padding: 28px 24px; @(isCurrentFree ? "opacity: .85;" : "")">
+                
+                <!-- Most Popular Badge -->
+                @if (isPopular)
+                {
+                    <div class="position-absolute" style="top: -13px; right: 24px;">
+                        <span class="badge rounded-pill px-3 py-2 text-white" 
+                              style="background: linear-gradient(135deg, var(--cp-forest-light) 0%, var(--cp-forest-deep) 100%); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(14,61,50,0.25);">
+                            <i class="bi bi-star-fill text-warning me-1"></i> Most Popular
+                        </span>
+                    </div>
+                }
+
+                <!-- Top Row: Icon in Circle & Free/Current pill -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width: 44px; height: 44px; background: var(--cp-mint-subtle); color: var(--cp-primary); font-size: 20px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <i class="bi @iconClass text-success"></i>
+                    </div>
+                    @if (isCurrentFree)
+                    {
+                        <span class="badge bg-secondary-subtle text-secondary px-2 py-1" style="font-size: 11px;">Default Free Tier</span>
+                    }
+                    else if (isCurrent)
+                    {
+                        <span class="badge px-2 py-1" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 11px;">Active</span>
+                    }
                 </div>
-                <div class="px-3 pb-2">
-                    <ul class="list-unstyled small mb-0" style="font-size: 13px;">
-                        <li><i class="bi bi-check-lg text-success me-1"></i>@t.DiscountPercent.ToString("0.##")% discount</li>
-                        <li><i class="bi bi-check-lg text-success me-1"></i>@(t.FreeDelivery ? "Free delivery" : "Standard delivery")</li>
-                        @if (t.PriorityDispensing) { <li><i class="bi bi-check-lg text-success me-1"></i>Priority dispensing</li> }
-                        @if (t.HasDedicatedPharmacist) { <li><i class="bi bi-check-lg text-success me-1"></i>Dedicated pharmacist</li> }
-                        <li><i class="bi bi-check-lg text-success me-1"></i>Up to @t.MaxFamilyAccounts family account(s)</li>
-                    </ul>
+
+                <!-- Tier Name & Subtitle -->
+                <h4 class="fw-bold mb-1" style="color: var(--cp-forest-deep);">@t.Name</h4>
+                <p class="text-muted small mb-3" style="min-height: 38px; line-height: 1.35;">@description</p>
+
+                <!-- Large Price -->
+                <div class="mb-4">
+                    <div class="d-flex align-items-baseline gap-1">
+                        <span class="fs-1 fw-extrabold font-monospace text-dark" style="letter-spacing: -1px; line-height: 1;">₱@t.MonthlyPrice.ToString("N2")</span>
+                        <span class="text-muted small fw-semibold">/month</span>
+                    </div>
+                    <div class="text-muted mt-1" style="font-size: 11.5px;">Billed monthly · Cancel anytime</div>
                 </div>
-                <div class="p-3 pt-2 mt-auto">
+
+                <!-- Action Button -->
+                <div class="mb-4">
                     @if (isCurrent)
                     {
-                        <button type="button" class="btn w-100 @(isCurrentFree ? "btn-secondary" : "btn-outline-success")" disabled>
-                            <i class="bi @(isCurrentFree ? "bi-star" : "bi-check-lg")"></i> @(isCurrentFree ? "Current Plan — Free" : "Current Plan")
+                        <button type="button" class="btn w-100 rounded-pill py-2 fw-semibold @(isCurrentFree ? "btn-secondary" : "btn-outline-success")" 
+                                style="@(isCurrentFree ? "opacity: .75;" : "")" disabled>
+                            <i class="bi @(isCurrentFree ? "bi-check-circle" : "bi-check-lg") me-1"></i> @(isCurrentFree ? "Current Plan — Free" : "Current Plan")
                         </button>
+                    }
+                    else if (t.MonthlyPrice == 0)
+                    {
+                        <!-- Free tier subscribes directly (no payment needed) -->
+                        <form asp-action="Subscribe" asp-route-id="@t.Id" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-secondary w-100 rounded-pill py-2 fw-semibold">
+                                @(cur != null ? "Switch to Basic (Free)" : "Get Plan")
+                            </button>
+                        </form>
                     }
                     else
                     {
-                        <form asp-action="Subscribe" asp-route-id="@t.Id" method="post">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-careplus w-100">@(cur != null ? "Switch to This Plan" : "Subscribe Now")</button>
-                        </form>
+                        <!-- Paid tier routes to SubscribeConfirm to select payment method -->
+                        <a asp-action="SubscribeConfirm" asp-route-id="@t.Id" 
+                           class="btn @(isPopular ? "btn-careplus text-white shadow-sm" : "btn-outline-careplus") w-100 rounded-pill py-2 fw-semibold text-center text-decoration-none d-block">
+                            Get Plan
+                        </a>
                     }
                 </div>
+
+                <!-- Benefits Section Divider & Label -->
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="fw-bold text-uppercase text-muted" style="font-size: 11px; letter-spacing: 0.8px;">Exclusive Program Benefits</span>
+                    <hr class="flex-grow-1 my-0" style="border-color: var(--cp-border); opacity: 0.8;" />
+                </div>
+
+                <!-- Perks Checklist -->
+                <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small flex-grow-1">
+                    @foreach (var perk in perkList)
+                    {
+                        var isHighlighted = perk.Contains("discount") || perk.Contains("Free") || perk.Contains("Priority") || perk.Contains("Dedicated");
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check-circle-fill text-success flex-shrink-0 mt-1" style="font-size: 13px;"></i>
+                            <span class="@(isHighlighted ? "fw-medium" : "text-muted")" style="font-size: 12.5px; line-height: 1.35;">@perk</span>
+                        </li>
+                    }
+                </ul>
+
             </div>
         </div>
     }
 </div>
 
+<!-- 4. Notice Card: Reframed for Pharmacy Context (Honest, Friendly, No False Urgency) -->
+<div class="table-card p-4 rounded-4 mb-4" style="background: var(--cp-surface-elevated); border: 1px solid var(--cp-border);">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-start gap-3">
+            <div class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                 style="width: 44px; height: 44px; background: var(--cp-mint-subtle); color: var(--cp-forest); font-size: 20px;">
+                <i class="bi bi-shield-check text-success"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-1" style="color: var(--cp-forest-deep);">New Members Are Always Welcome</h6>
+                <p class="text-muted small mb-0" style="max-width: 640px;">
+                    Enroll today with no long-term commitment. Switch tiers, manage auto-refills, or cancel anytime directly from your patient portal dashboard with zero cancellation fees.
+                </p>
+            </div>
+        </div>
+        <div class="flex-shrink-0">
+            @if (cur != null)
+            {
+                <span class="badge px-3 py-2" style="background-color: var(--cp-success-bg); color: var(--cp-success); font-size: 12px;">
+                    <i class="bi bi-patch-check-fill me-1"></i> Active Member
+                </span>
+            }
+            else
+            {
+                var recommendedTier = Model.Tiers.FirstOrDefault(t => t.MonthlyPrice > 0) ?? freeTier;
+                if (recommendedTier != null && recommendedTier.MonthlyPrice > 0)
+                {
+                    <a asp-action="SubscribeConfirm" asp-route-id="@recommendedTier.Id" class="btn btn-sm btn-careplus px-3 py-2 rounded-pill">
+                        Enroll Now <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Membership History Table (Restyled to match, preserved logic) -->
 @if (Model.History.Any())
 {
-    <div class="table-card mt-3">
+    <div class="table-card mt-4">
         <div class="table-card-header">
             <div>
-                <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-clock-history me-2"></i>Membership History</div>
+                <div class="fw-bold fs-6" style="color: var(--cp-forest-deep);"><i class="bi bi-clock-history text-success me-2"></i>Membership History</div>
                 <div class="text-muted" style="font-size: 12px;">Your past and current membership enrollments</div>
             </div>
         </div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead>
-                    <tr><th>Tier</th><th>Started</th><th>Next Billing</th><th>Status</th></tr>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Started</th>
+                        <th>Next Billing</th>
+                        <th>Payment Method</th>
+                        <th>Status</th>
+                    </tr>
                 </thead>
                 <tbody>
                     @foreach (var m in Model.History)
                     {
                         <tr>
-                            <td class="fw-semibold">@m.MembershipTier?.Name</td>
+                            <td class="fw-semibold text-dark">@m.MembershipTier?.Name</td>
                             <td>@m.StartDate.ToString("yyyy-MM-dd")</td>
                             <td>@m.NextBillingDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                <span class="badge bg-light text-dark border font-monospace" style="font-size: 11px;">
+                                    @m.PaymentMethod
+                                </span>
+                            </td>
                             <td>
                                 @switch (m.Status)
                                 {

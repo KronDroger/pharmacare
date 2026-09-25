@@ -391,9 +391,45 @@ namespace CarePlusPharmacy.Controllers
             return View(vm);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> SubscribeConfirm(int id)
+        {
+            var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
+            if (customer == null)
+            {
+                TempData["Error"] = "No patient profile is linked to your account yet. Ask the pharmacy to link your account.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            var tier = await _context.MembershipTiers.FindAsync(id);
+            if (tier == null || !tier.IsActive)
+            {
+                TempData["Error"] = "That membership tier is not available right now.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            var current = await _context.CustomerMemberships
+                .FirstOrDefaultAsync(m => m.CustomerId == customer.Id && m.Status == MembershipStatus.Active);
+
+            if (tier.MonthlyPrice == 0)
+            {
+                // Free tier doesn't need confirmation or payment
+                return RedirectToAction(nameof(Membership));
+            }
+
+            if (current != null && current.MembershipTierId == tier.Id)
+            {
+                TempData["Success"] = $"You are already subscribed to {tier.Name}.";
+                return RedirectToAction(nameof(Membership));
+            }
+
+            ViewBag.CurrentMembership = current;
+            return View(tier);
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Subscribe(int id)
+        public async Task<IActionResult> Subscribe(int id, string? paymentMethod)
         {
             var customer = await _currentCustomerService.GetCurrentCustomerAsync(User);
             if (customer == null)
@@ -430,20 +466,83 @@ namespace CarePlusPharmacy.Controllers
                 switched = true;
             }
 
-            _context.CustomerMemberships.Add(new CustomerMembership
+            // Determine valid payment method
+            var validPaymentMethods = new[] { "Cash", "GCash", "Card", "PayMongo" };
+            string chosenMethod;
+            if (tier.MonthlyPrice == 0)
             {
-                CustomerId = customer.Id,
-                MembershipTierId = tier.Id,
-                StartDate = DateTime.Today,
-                NextBillingDate = DateTime.Today.AddMonths(1),
-                Status = MembershipStatus.Active,
-                PaymentMethod = "Portal"
-            });
-            await _context.SaveChangesAsync();
-            await LogCustomerActionAsync("MEMBERSHIP_SUBSCRIBED", $"Customer subscribed to tier '{tier.Name}' (₱{tier.MonthlyPrice:N2}/month).");
-            TempData["Success"] = switched
-                ? $"Membership switched to {tier.Name}."
-                : $"Welcome to {tier.Name}! Your membership is now active.";
+                chosenMethod = "Free";
+            }
+            else
+            {
+                chosenMethod = validPaymentMethods.Contains(paymentMethod) ? paymentMethod! : "Cash";
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var membership = new CustomerMembership
+                {
+                    CustomerId = customer.Id,
+                    MembershipTierId = tier.Id,
+                    StartDate = DateTime.Today,
+                    NextBillingDate = DateTime.Today.AddMonths(1),
+                    Status = MembershipStatus.Active,
+                    PaymentMethod = chosenMethod
+                };
+                _context.CustomerMemberships.Add(membership);
+
+                // Create Sale & Billing if this is a paid tier
+                if (tier.MonthlyPrice > 0)
+                {
+                    var sale = new Sale
+                    {
+                        CustomerId = customer.Id,
+                        CashierId = user?.Id,
+                        PaymentMethod = chosenMethod,
+                        SaleDate = DateTime.Today,
+                        VatableSales = 0m,
+                        VatExemptSales = tier.MonthlyPrice,
+                        VatAmount = 0m,
+                        DiscountAmount = 0m,
+                        DiscountType = SaleDiscountType.None,
+                        AppliedDiscountSource = $"MembershipEnrollment:{tier.Name}",
+                        PointsEarned = (int)(tier.MonthlyPrice / 100),
+                        PointsRedeemed = 0
+                    };
+                    _context.Sales.Add(sale);
+                    await _context.SaveChangesAsync();
+
+                    var billing = new Billing
+                    {
+                        SaleId = sale.Id,
+                        InvoiceNumber = $"MBR-{DateTime.Today.Year}-{sale.Id:D5}",
+                        AmountDue = tier.MonthlyPrice,
+                        AmountPaid = tier.MonthlyPrice,
+                        ChangeAmount = 0m,
+                        PaymentMethod = chosenMethod,
+                        PaymentStatus = PaymentStatus.Paid,
+                        DateIssued = DateTime.Today
+                    };
+                    _context.Billings.Add(billing);
+                }
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                await LogCustomerActionAsync("MEMBERSHIP_SUBSCRIBED", $"Customer subscribed to tier '{tier.Name}' (₱{tier.MonthlyPrice:N2}/month) via {chosenMethod}.");
+                TempData["Success"] = switched
+                    ? $"Membership switched to {tier.Name}."
+                    : $"Welcome to {tier.Name}! Your membership is now active.";
+            }
+            catch (Exception)
+            {
+                await tx.RollbackAsync();
+                TempData["Error"] = "Unable to complete subscription. Please try again.";
+            }
+
             return RedirectToAction(nameof(Membership));
         }
 

@@ -92,7 +92,7 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model.Sale != null)
+                @if (Model.Sale != null && Model.Sale.Details.Any())
                 {
                     @foreach (var item in Model.Sale.Details)
                     {
@@ -108,6 +108,24 @@
                             <td class="num fw-bold">₱@item.LineTotal.ToString("N2")</td>
                         </tr>
                     }
+                }
+                else
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">
+                                @(Model.Sale?.AppliedDiscountSource.StartsWith("MembershipEnrollment:") == true 
+                                    ? $"{Model.Sale.AppliedDiscountSource.Substring("MembershipEnrollment:".Length)} — Monthly Membership" 
+                                    : "CarePlus Pharmacy Membership / Service")
+                            </div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                Healthcare Membership Program &amp; Customer Benefit Enrollment
+                            </div>
+                        </td>
+                        <td class="num fw-semibold">1</td>
+                        <td class="num">₱@Model.AmountDue.ToString("N2")</td>
+                        <td class="num fw-bold">₱@Model.AmountDue.ToString("N2")</td>
+                    </tr>
                 }
             </tbody>
         </table>
