@@ -224,3 +224,55 @@
 - [x] `Views/Billing/Details.cshtml`: Added line-item fallback for membership invoices when `Sale.Details` is empty so official invoices render cleanly.
 - [x] Build verified clean (`dotnet build`: 0 warnings, 0 errors). Changes committed in `67dfdf4`.
 
+---
+
+# Near-Expiry "Buy 1 Take 1" (BOGO) Promo — Phases 1-4 of 6
+
+Automatic promo that discounts near-expiring stock out of inventory instead of writing it off.
+
+## Phase 28: BOGO — Phase 1 of 6: `MedicineBatch.IsNearExpiry` flag (done, commit `4f4da50`)
+- [x] `Models/MedicineBatch.cs`: `public const int NearExpiryThresholdDays = 120;` and `[NotMapped] public bool IsNearExpiry => Quantity > 0 && ExpiryDate.Date > DateTime.Today && ExpiryDate.Date <= DateTime.Today.AddDays(NearExpiryThresholdDays);`
+- [x] Deliberately a computed `[NotMapped]` property (no new column, **no migration**), mirroring the existing computed `SellableStock` / `ExpiredStock` style in `Models/Medicine.cs`.
+- [x] Boundaries hand-checked: expiring **today** is NOT near-expiry (still sellable), expired is excluded, `Quantity == 0` is excluded. Upper bound at exactly +120 days is inclusive.
+- [x] Caveat recorded: a computed C# property **cannot be translated to SQL**, so every query that needs this filter must restate the predicate (see Phase 29).
+
+## Phase 29: BOGO — Phase 2 of 6: Expiry Monitor "Near Expiry (BOGO Eligible)" tab (done, commit `e4b5ba5`)
+- [x] `Controllers/MedicinesController.cs` `Expiring`: new `nearExpiryQuery` + `ViewBag.NearExpiryCount` / `NearExpiryValuation`, and a `"nearexpiry"` case in the tab switch. Predicate restated in LINQ (not `IsNearExpiry`) with a comment that it must stay in sync with the model.
+- [x] `Views/Medicines/Expiring.cshtml`: new filter pill after "Safe Stock", a 5th `stat-card` (BOGO Eligible batch count + recoverable ₱ valuation, `icon-amber`), and a **"BOGO Promo"** table column rendering a `badge text-bg-warning` "BOGO Eligible" + "Near expiry ≤ 120 days" (or `—`); empty-state `colspan` 8 → 9.
+- [x] Verified live against 6 hand-staged boundary rows: +1d and +119d and +120d **listed**; +121d, expires-today, qty 0 and expired **excluded**. Tab count matched exactly (3). All Batches tab unaffected. DB restored afterwards.
+- [x] Known overlap: the 120-day window sits on top of the existing 90-day "Warning"/"Safe" tiers, so some batches appear under both tabs. Intentional.
+
+## Phase 30: BOGO — Phase 3 of 6: POS cart "BOGO Eligible (near expiry)" badge (done, commit `8b6f334`)
+- [x] `Controllers/SalesController.cs`: added `FefoOrder(Medicine)` (batch ordering **deliberately identical** to the Checkout deduction order, with a comment saying so) and `NearExpiryPrefix(Medicine)` → `(Units, Batch, Expiry)`. The `Medicines` catalog endpoint now returns `nearExpiryUnits` / `nearExpiryBatch` / `nearExpiryDate`.
+- [x] Because the cart is pure client-side with no per-change server round-trip, the **FEFO projection is computed server-side** and the JS only compares `item.qty` against the server-supplied `nearExpiryUnits`. Sound because FEFO sorts by ascending expiry, so near-expiry batches form a contiguous prefix of the order. The client never derives stock or eligibility itself.
+- [x] `SalesController.Create`: for the Rx pre-load path, batches are queried for the Rx medicines and passed via `ViewBag.RxNearExpiry` so pre-loaded lines get the same badge as catalog-added lines.
+- [x] `Views/Sales/Create.cshtml`: `addToCart` takes 3 new trailing params; `renderCart` renders the badge with batch #, expiry date, and "N of M units" when a line spans both near-expiry and fresh stock. **Visual only — no pricing in this phase.**
+- [x] Verified live in real Chrome via Playwright (the cart is JS-rendered): badge correct on Tempra ×4, Calpol ×4, Calpol ×50 ("42 of 50 units" span), Rx 57 pre-load; **no** badge on Alaxan / Dolfenal / Celebrex (fresh-only). All line totals stayed at full price (₱30.00 / ₱580.00 / ₱1740.00), confirming no pricing leaked in. 0 JS errors.
+- [x] Known gap: the badge is a *projection*, correct only while stock is unchanged between add-to-cart and checkout. Checkout stays authoritative.
+
+## Phase 31: BOGO — Phase 4 of 6: Server-side BOGO pricing (done, commit `57c477f`)
+- [x] `SalesController.Checkout`: per dispensed batch, `payableUnits = isNearExpiry ? (take + 1) / 2 : take` (integer division = ceil, so 3 units → pay 2) and `bogoSaved = (take - payableUnits) × UnitPrice`. **Server-side only, no JavaScript.** FEFO-span handled naturally by the per-batch loop; pairing never spans two batches.
+- [x] **Critical ordering hazard fixed:** `IsNearExpiry` requires `Quantity > 0`, and the FEFO loop does `batch.Quantity -= take` *before* building the line — so a fully-drained batch would flip the flag to `false` and silently lose its discount exactly when the whole near-expiry batch sells out. The flag is now captured into a local **before** the deduction, with a comment explaining why.
+- [x] `Models/SaleDetail.cs`: new `BogoDiscountAmount` column + `ChargedTotal => LineTotal - BogoDiscountAmount`. `Quantity`/`UnitPrice`/`LineTotal` deliberately keep the **true dispensed value at full price** so inventory and audit stay truthful; the giveaway is recorded separately.
+- [x] `Models/Sale.cs`: `GrossAmount` now sums `ChargedTotal`, plus a derived `BogoDiscountAmount`. This was **required**, not cosmetic: `Sale.GrossAmount` and the Sales KPI both recompute from `Details`, so a local-only change in `Checkout` would have left the ledger claiming ₱200 while charging ₱100 — and `TotalAmount` feeds ~8 views.
+- [x] BOGO reduces **gross**, deliberately, not `DiscountAmount`: Phase 6 requires the percentage discount to apply to the already-halved amount, and gross is what feeds `PricingService`. VAT therefore accrues only on what is actually billed (₱100 → VAT ₱10.71, verified).
+- [x] `Controllers/SalesController.cs` `Index` KPI and `Controllers/ReportsController.cs` top-medicines revenue updated to net off `BogoDiscountAmount`; both confirmed to translate in EF without errors (`/Sales/Index`, `/Reports/Index`, `/Sales/Details`, `/Billing/Details`, `/Customers/Index`, `/Crm/Index` all HTTP 200).
+- [x] Migration `20260926094733_AddBogoDiscountToSaleDetails` (additive, `decimal(10,2) NOT NULL DEFAULT 0`, so the 90 existing sales are untouched). No existing migration edited.
+- [x] **Required hand-check passed: 4 units of a ₱50 near-expiry item = pay ₱100.00, not ₱200.00** (line persisted as `ZZNEAR qty=4 price=50.00 bogoSaved=100.00`).
+- [x] Full matrix on a ₱50 item: 1u→₱50 · 2u→₱50 · 3u→₱100 · **4u→₱100** · 5u→₱150 · 6u→₱150.
+- [x] FEFO-span: 3 near-expiry + buy 5 → `ZZNEAR 3u saved ₱50` + `ZZFRESH 2u saved ₱0` = ₱200; 4 + buy 6 → ₱200; 200 + buy 250 → saved ₱5,000 + 50 fresh ₱0 = ₱7,500. Only the near-expiry portion is discounted.
+- [x] Drain regression tests (the hazard above): 4 near-expiry buying exactly 4 → **₱100**; 2 buying 2 → ₱50; 1 buying 1 → ₱50 with ₱0 saved.
+- [x] Per-line independence: 2-line cart ₱50×4 + ₱80×3 = **₱260.00**, matching hand calculation.
+- [x] Data integrity: for every test sale `Σ(ChargedTotal) == VatableSales == Billings.AmountDue`, and the receipt page shows a consistent Gross / Total Amount Due. Test medicines, batches and the 13 test sales purged (90 sales / 90 billings intact); build 0 warn / 0 err.
+
+### Tooling gotchas found while verifying (worth knowing before Phase 5)
+- **`dotnet build` does NOT validate Razor views in this project.** Proved by injecting `@x ?? <span>` into a `.cshtml` — the build still reported 0 warnings / 0 errors. So a green build does **not** mean a view compiles. Consider adding `<RazorCompileOnBuild>` to the csproj.
+- Worse, a broken view gets baked into the output and **`dotnet run` leaves a child `CarePlusPharmacy.exe` process alive** — killing the parent `dotnet` does not stop the old server, so a stale server keeps serving old markup and looks like a phantom bug. Reliable recovery: kill `CarePlusPharmacy` *and* `dotnet`, then `rm -rf obj bin`, rebuild, restart. Always verify views by actually running the app.
+- **The seed data contains no near-expiry stock** — all 71 seeded batches are 6+ months out, so the BOGO tab shows 0 and Phases 3-6 have nothing to test on a fresh DB. (The near-expiry demo batches at `DbInitializer.cs:75-83` only run on a truly empty database; the bulk loop at 506/517 uses `AddMonths(6..24)`.) Rows were hand-staged per phase for testing. Adding near-expiry batches to the seed is still an open question.
+
+### Remaining (not yet started)
+- [ ] **Phase 5 of 6:** receipt/invoice line "BOGO applied — Batch \<number\> (near expiry)" with amount saved, plus an `AuditLog` entry. This also closes a real gap: receipt line items still render `d.LineTotal` (full price) while Gross below is BOGO-reduced, so the lines do not visibly add up to the total.
+- [ ] **Phase 6 of 6:** verify BOGO (quantity discount) + Senior/PWD or Membership (percentage) stack without double-counting — BOGO halves payable units first, then the percentage applies to the already-halved amount. **Known pre-existing bug to inspect first:** `Checkout` computes `finalAmount = grossTotal - discount - points` and never subtracts `VatAmount` for Senior/PWD, while `Sale.TotalAmount` *does* subtract it — so the amount charged and the amount reported already disagree for statutory discount sales, independent of BOGO.
+- [ ] **POS subtotal gap:** the on-screen POS summary still shows the full pre-BOGO price because Phase 4 was specified as server-side-only. A cashier would see ₱200 and collect ₱100. Needs fixing before demo — should read the server's BOGO figures rather than recompute them client-side.
+
+
