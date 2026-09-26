@@ -126,11 +126,92 @@ namespace CarePlusPharmacy.Controllers
                 .ToList();
         }
 
+        // ---- Shared FEFO + BOGO line planning ----
+        // Single source of truth for how a cart quantity is split across batches and
+        // what the line is actually charged. Both Checkout and the POS cart summary
+        // (CartPricing) go through PlanFefoDispense, so the figures on screen can
+        // never drift from the figures billed.
+
+        public class FefoSlice
+        {
+            public int BatchId { get; set; }
+            public string BatchNumber { get; set; } = string.Empty;
+            public int Quantity { get; set; }
+            public bool IsNearExpiry { get; set; }
+            public int PayableUnits { get; set; }
+        }
+
+        public class FefoLinePlan
+        {
+            public List<FefoSlice> Slices { get; } = new List<FefoSlice>();
+            public decimal LineTotal { get; set; }
+            public decimal BogoDiscount { get; set; }
+            public decimal PayableAmount { get; set; }
+            public int BogoUnits { get; set; }
+            public string? BogoBatch { get; set; }
+            public string? BogoExpiry { get; set; }
+        }
+
+        // Walks the FEFO order for `quantity` units and returns the per-batch split
+        // plus the charged amount. Pure — it never mutates batch stock — so it is
+        // safe to call purely for display purposes.
+        private static FefoLinePlan PlanFefoDispense(Medicine medicine, int quantity)
+        {
+            var plan = new FefoLinePlan();
+            int remaining = quantity;
+
+            foreach (var batch in FefoOrder(medicine))
+            {
+                if (remaining <= 0) break;
+                int take = Math.Min(batch.Quantity, remaining);
+
+                // Must be read BEFORE the deduction: draining a batch sets its
+                // Quantity to 0, which would flip IsNearExpiry to false and
+                // silently lose the discount on a fully-consumed near-expiry batch.
+                bool isNearExpiry = batch.IsNearExpiry;
+
+                remaining -= take;
+
+                // Buy 1 Take 1 (near-expiry promo): every 2 units taken from a
+                // near-expiry batch are charged for only 1, rounded down, so
+                // payable units = ceil(take / 2) = (take + 1) / 2.
+                // 2 units -> pay 1, 3 -> pay 2, 4 -> pay 2. Fresh batches are
+                // charged in full, and pairing never spans two batches.
+                int payableUnits = isNearExpiry ? (take + 1) / 2 : take;
+
+                plan.Slices.Add(new FefoSlice
+                {
+                    BatchId = batch.Id,
+                    BatchNumber = batch.BatchNumber,
+                    Quantity = take,
+                    IsNearExpiry = isNearExpiry,
+                    PayableUnits = payableUnits
+                });
+
+                plan.LineTotal += take * medicine.UnitPrice;
+
+                if (isNearExpiry)
+                {
+                    plan.BogoDiscount += (take - payableUnits) * medicine.UnitPrice;
+                    plan.BogoUnits += take;
+
+                    if (plan.BogoBatch == null)
+                    {
+                        plan.BogoBatch = batch.BatchNumber;
+                        plan.BogoExpiry = batch.ExpiryDate.ToString("yyyy-MM-dd");
+                    }
+                }
+            }
+
+            plan.PayableAmount = plan.LineTotal - plan.BogoDiscount;
+            return plan;
+        }
+
         // Batches the FEFO pass will hit before reaching fresh stock, and their
         // unit count. Because FEFO sorts by ascending expiry, near-expiry batches
         // form a contiguous prefix of the order, so the first N units of any cart
-        // quantity are dispensed from them. Used for the POS badge only in this
-        // phase; the actual BOGO pricing is applied server-side at Checkout.
+        // quantity are dispensed from them. Drives the catalog-grid eligibility
+        // badge; the actual payable figures come from PlanFefoDispense.
         private static (int Units, string? Batch, string? Expiry) NearExpiryPrefix(Medicine medicine)
         {
             var nearExpiry = FefoOrder(medicine).Where(b => b.IsNearExpiry).ToList();
@@ -157,17 +238,6 @@ namespace CarePlusPharmacy.Controllers
                     .FirstOrDefaultAsync(p => p.Id == prescriptionId.Value);
                 ViewBag.Prescription = rx;
 
-                // Near-expiry prefix for the Rx lines the POS pre-loads into the cart,
-                // so pre-loaded lines get the same badge as catalog-added lines.
-                if (rx != null)
-                {
-                    var rxMedicineIds = rx.Details.Select(d => d.MedicineId).Distinct().ToList();
-                    var rxMedicines = await _context.Medicines
-                        .Include(m => m.Batches)
-                        .Where(m => rxMedicineIds.Contains(m.Id))
-                        .ToListAsync();
-                    ViewBag.RxNearExpiry = rxMedicines.ToDictionary(m => m.Id, NearExpiryPrefix);
-                }
             }
 
             return View();
@@ -248,6 +318,65 @@ namespace CarePlusPharmacy.Controllers
             public int Quantity { get; set; }
         }
 
+        // Authoritative per-line pricing for the on-screen POS cart.
+        //
+        // The cart used to render quantity x unit price in JavaScript, which ignored
+        // the near-expiry BOGO halving and made the screen disagree with Checkout
+        // (e.g. showing a full-price subtotal for a half-price line). The client now
+        // only *displays* what this endpoint returns, and the figures come from the
+        // same PlanFefoDispense pass Checkout bills with — so the on-screen subtotal
+        // cannot drift from the amount actually charged.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CartPricing([FromBody] List<PosItemDto> items)
+        {
+            if (items == null || items.Count == 0)
+            {
+                return Json(new { success = true, lines = new List<object>() });
+            }
+
+            var medicineIds = items
+                .Where(i => i.Quantity > 0)
+                .Select(i => i.MedicineId)
+                .Distinct()
+                .ToList();
+
+            var medicines = await _context.Medicines
+                .Include(m => m.Batches)
+                .Where(m => medicineIds.Contains(m.Id))
+                .ToListAsync();
+
+            var lines = new List<object>();
+
+            foreach (var item in items.Where(i => i.Quantity > 0))
+            {
+                var medicine = medicines.FirstOrDefault(m => m.Id == item.MedicineId);
+                if (medicine == null) continue;
+
+                var plan = PlanFefoDispense(medicine, item.Quantity);
+
+                lines.Add(new
+                {
+                    medicineId = medicine.Id,
+                    quantity = item.Quantity,
+                    unitPrice = medicine.UnitPrice,
+                    // lineTotal   = full price for the quantity (qty x unit price)
+                    // bogoDiscount= what BOGO takes off
+                    // payable     = what Checkout will charge for this line
+                    lineTotal = plan.LineTotal,
+                    bogoDiscount = plan.BogoDiscount,
+                    payable = plan.PayableAmount,
+                    // bogoUnits > 0 but bogoDiscount == 0 means the line is
+                    // BOGO-eligible yet has not reached a pair (e.g. 1 unit).
+                    bogoUnits = plan.BogoUnits,
+                    bogoBatch = plan.BogoBatch,
+                    bogoDate = plan.BogoExpiry
+                });
+            }
+
+            return Json(new { success = true, lines });
+        }
+
         public class PosCheckoutModel
         {
             public int? CustomerId { get; set; }
@@ -318,42 +447,29 @@ namespace CarePlusPharmacy.Controllers
                     }
 
                     // Deduct stock FEFO — expired batches are never dispensed.
-                    int remainingToDeduct = item.Quantity;
-                    var activeBatches = FefoOrder(medicine);
+                    // PlanFefoDispense decides the split and the BOGO halving from the
+                    // same pass Checkout bills against; it is pure, so the stock
+                    // mutation happens here, afterwards.
+                    var plan = PlanFefoDispense(medicine, item.Quantity);
 
-                    foreach (var batch in activeBatches)
+                    foreach (var slice in plan.Slices)
                     {
-                        if (remainingToDeduct <= 0) break;
-                        int take = Math.Min(batch.Quantity, remainingToDeduct);
-
-                        // Must be read BEFORE the deduction: draining a batch sets its
-                        // Quantity to 0, which would flip IsNearExpiry to false and
-                        // silently lose the discount on a fully-consumed near-expiry batch.
-                        bool isNearExpiry = batch.IsNearExpiry;
-
-                        batch.Quantity -= take;
-                        remainingToDeduct -= take;
-
-                        // Buy 1 Take 1 (near-expiry promo): every 2 units taken from a
-                        // near-expiry batch are charged for only 1, rounded down, so
-                        // payable units = ceil(take / 2) = (take + 1) / 2.
-                        // 2 units -> pay 1, 3 -> pay 2, 4 -> pay 2. Fresh batches are
-                        // charged in full, and pairing never spans two batches.
-                        int payableUnits = isNearExpiry ? (take + 1) / 2 : take;
-                        var lineGross = take * medicine.UnitPrice;
-                        var bogoSaved = (take - payableUnits) * medicine.UnitPrice;
+                        var batch = medicine.Batches.First(b => b.Id == slice.BatchId);
+                        batch.Quantity -= slice.Quantity;
 
                         saleDetails.Add(new SaleDetail
                         {
                             MedicineId = medicine.Id,
-                            BatchId = batch.Id,
-                            Quantity = take,
+                            BatchId = slice.BatchId,
+                            Quantity = slice.Quantity,
                             UnitPrice = medicine.UnitPrice,
-                            BogoDiscountAmount = bogoSaved
+                            BogoDiscountAmount = slice.IsNearExpiry
+                                ? (slice.Quantity - slice.PayableUnits) * medicine.UnitPrice
+                                : 0m
                         });
-
-                        grossTotal += lineGross - bogoSaved;
                     }
+
+                    grossTotal += plan.PayableAmount;
                 }
 
                 // Statutory Senior/PWD discount requires a valid government ID number.

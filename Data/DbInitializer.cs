@@ -80,8 +80,8 @@ namespace CarePlusPharmacy.Data
                     new MedicineBatch { MedicineId = medicines[4].Id, BatchNumber = "B-2026-06", Quantity = 95, ExpiryDate = DateTime.Today.AddMonths(11), DateReceived = DateTime.Today.AddDays(-45) },
                     new MedicineBatch { MedicineId = medicines[5].Id, BatchNumber = "B-2026-07", Quantity = 110, ExpiryDate = DateTime.Today.AddMonths(15), DateReceived = DateTime.Today.AddDays(-10) },
                     new MedicineBatch { MedicineId = medicines[6].Id, BatchNumber = "B-2026-08", Quantity = 160, ExpiryDate = DateTime.Today.AddMonths(9), DateReceived = DateTime.Today.AddDays(-20) },
-                    new MedicineBatch { MedicineId = medicines[7].Id, BatchNumber = "B-2026-09", Quantity = 18, ExpiryDate = DateTime.Today.AddDays(-5), DateReceived = DateTime.Today.AddDays(-180) } // Expired batch demo
-                );
+            new MedicineBatch { MedicineId = medicines[7].Id, BatchNumber = "B-2026-09", Quantity = 18, ExpiryDate = DateTime.Today.AddDays(-5), DateReceived = DateTime.Today.AddDays(-180) } // Expired batch demo
+        );
                 await context.SaveChangesAsync();
 
                 var customers = new List<Customer>
@@ -213,6 +213,7 @@ namespace CarePlusPharmacy.Data
             await EnsureRichDataSeededAsync(context, userManager);
             await EnsureVatExemptMedicinesAsync(context);
             await EnsureRxRequiredMedicinesAsync(context);
+            await EnsureNearExpiryDemoBatchesAsync(context);
             await EnsurePurchaseOrderDataAsync(context);
             await EnsureMembershipTiersAsync(context);
 
@@ -295,6 +296,53 @@ namespace CarePlusPharmacy.Data
                 .ToList();
             foreach (var med in rxMeds) { med.RxRequired = true; }
             if (rxMeds.Any()) { await context.SaveChangesAsync(); }
+        }
+
+        // Seed near-expiry BOGO stock on databases that have none.
+        //
+        // Without this the Buy 1 Take 1 promo is invisible on a seeded database: no
+        // batch falls inside the 120-day threshold, so the POS never badges a line
+        // and the Expiry Monitor / reports have nothing to show. Existing DBs also
+        // skip the initial `Suppliers.Any()` bootstrap block, so they would never
+        // receive the demo batches seeded there either.
+        private static async Task EnsureNearExpiryDemoBatchesAsync(ApplicationDbContext context)
+        {
+            // Two demo lines: one comfortably inside the window, one critical.
+            // Both are non-Rx and VAT-able so the promo can be exercised straight
+            // from the POS, and so the Senior/PWD + BOGO combination is testable
+            // without raising a prescription first.
+            var targets = new[]
+            {
+                new { Name = "Zithromax 500mg", BatchNumber = "B-2026-N1", Quantity = 60, ExpiryInDays = 45, ReceivedDaysAgo = 150 },
+                new { Name = "Forxiga 10mg", BatchNumber = "B-2026-N2", Quantity = 40, ExpiryInDays = 20, ReceivedDaysAgo = 170 }
+            };
+
+            // Idempotency is per batch number, not a global "does any near-expiry
+            // stock exist" check: an unrelated leftover near-expiry batch must not
+            // suppress the demo stock, and re-running must not duplicate it.
+            var batches = new List<MedicineBatch>();
+            foreach (var t in targets)
+            {
+                if (context.MedicineBatches.Any(b => b.BatchNumber == t.BatchNumber)) continue;
+
+                var medicine = context.Medicines.FirstOrDefault(m => m.Name == t.Name);
+                if (medicine == null) continue;
+
+                batches.Add(new MedicineBatch
+                {
+                    MedicineId = medicine.Id,
+                    BatchNumber = t.BatchNumber,
+                    Quantity = t.Quantity,
+                    ExpiryDate = DateTime.Today.AddDays(t.ExpiryInDays),
+                    DateReceived = DateTime.Today.AddDays(-t.ReceivedDaysAgo)
+                });
+            }
+
+            if (batches.Any())
+            {
+                context.MedicineBatches.AddRange(batches);
+                await context.SaveChangesAsync();
+            }
         }
 
         // Seed purchase orders on databases that have none (existing DBs skip the

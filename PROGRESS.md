@@ -357,12 +357,11 @@ near-expiry item = ₱100.00, not ₱200.00.**
   value. Only reachable *because* BOGO lowers the gross. Now capped at the true payable.
 
 **Open items (display-only unless noted):**
-- [ ] **POS subtotal gap — fix before demo.** The on-screen POS summary is built from full
-      line price and so ignores BOGO: a cashier sees ₱200 and collects ₱100 (or sees ₱142.86
-      and collects ₱71.43 on a Senior/PWD BOGO sale). Every server-side figure and both
-      receipts are correct. Fix by having the server return per-line payable figures and
-      rendering those — do **not** reimplement FEFO/batch logic in JavaScript.
-- [ ] Seed data ships with no near-expiry stock, so the promo shows nothing on a fresh DB.
+- [x] ~~**POS subtotal gap — fix before demo**~~ — **fixed in Phase 34 below.** The server now
+      returns per-line payable figures and the cart renders *those*, so the screen can no
+      longer disagree with checkout. No FEFO/batch logic was reimplemented in JavaScript.
+- [x] ~~Seed data ships with no near-expiry stock~~ — **fixed in Phase 34 below.** Two demo
+      near-expiry batches are now seeded idempotently on every database.
 - [ ] Membership-fee sales show `Gross Total ₱0.00` on their receipt (`GrossAmount` sums
       `SaleDetails`; membership sales have none). Pre-existing, unrelated to BOGO.
 - [ ] Audit rows 130–142 are orphans referencing Phase 4's deleted test sales. Left
@@ -373,3 +372,103 @@ near-expiry item = ₱100.00, not ₱200.00.**
 staged `ZZTEST*` medicines as real data. Build with `dotnet build` (0 warnings / 0 errors is
 the bar) — but note it only re-compiles Razor when a `.cshtml` actually changed, and it
 fails with a confusing file-lock error if the app is still running.
+
+# Near-Expiry BOGO Promo — Follow-Up (Phase 34)
+
+## Phase 34: POS cart displays the BOGO discount + near-expiry seed data (done)
+- [x] **Closed the "POS subtotal gap"** — the last open BOGO defect, and the one thing standing
+      between the promo and a demo. The cart subtotal was computed in JavaScript as
+      `qty × price`, so it silently ignored the BOGO halving: a cashier saw ₱200.00 and
+      collected ₱100.00. Every server-side figure and both receipts were already correct, so
+      this was purely a display fault — but a cashier who cannot trust the screen will not
+      trust the promo.
+- [x] **The rule that was followed: no FEFO/batch logic in JavaScript.** The tempting fix is to
+      re-derive the halving client-side. Instead the arithmetic stays server-side, in one place.
+- [x] **Extracted `PlanFefoDispense` as the single source of truth.** It walks the FEFO order for
+      a quantity and returns the per-batch split, the BOGO halving and the payable amount. It is
+      *pure* — it never mutates batch stock — so it is safe to call for display. `Checkout` was
+      refactored onto it (it previously had the halving inline) so the billed figure and the
+      displayed figure come from one code path and cannot drift. This also keeps the
+      read-`IsNearExpiry`-before-deducting rule in a single place, which is the subtle trap noted
+      in Phase 4: draining a batch sets `Quantity = 0`, which would flip `IsNearExpiry` to false
+      and lose the discount on a fully-consumed batch.
+- [x] **New `POST /Sales/CartPricing` endpoint** takes the cart (`{ medicineId, quantity }[]`) and
+      returns, per line, the authoritative `lineTotal` (full price), `bogoDiscount`, `payable`,
+      plus `bogoUnits` / `bogoBatch` / `bogoDate` for the badge. Protected with
+      `[ValidateAntiForgeryToken]`, consistent with `Checkout`.
+- [x] **The cart now renders the server's numbers and nothing else.** `renderCart()` became async:
+      it fetches pricing, then draws each line from `payable`, and the subtotal is `Σ payable`
+      rather than a client-side product. The VAT pools (`vatable` / `exempt`) are built from the
+      same BOGO-reduced payable amounts, so the statutory 20% and the VAT waiver are computed on
+      what is actually owed — which is what makes the Senior/PWD case come out right.
+- [x] **On failure the cart refuses to guess.** If the pricing fetch fails, the last good figures
+      are kept, a red banner explains why, and **checkout is disabled**. Falling back to
+      `qty × price` is precisely the bug being fixed, and a confidently wrong total is worse than
+      an obvious failure. A sequence guard discards out-of-order responses when the cashier clicks
+      `+`/`-` quickly.
+- [x] **Discount tag on BOGO lines**, matching the app's existing `text-bg-warning` pill pattern:
+  a **strikethrough full price** beside the reduced payable, a **"BOGO Buy 1 Take 1 applied"**
+  badge, and the batch / expiry / units-saved detail. A line that is BOGO-*eligible* but has not
+  reached a pair yet (e.g. 1 unit) keeps the original "BOGO Eligible (near expiry)" wording, so
+  the two states stay distinguishable. A **"BOGO Savings (near expiry)"** row was added to the
+  summary footer, shown only when a saving applies.
+- [x] **Removed the now-dead near-expiry fields from the client cart object**, and the
+      `ViewBag.RxNearExpiry` plumbing that existed only to badge Rx-pre-loaded lines. The cart
+      badge is now served by `CartPricing`, so there is exactly one source of truth for it.
+- [x] **Seeded near-expiry stock** so the promo is demoable on a fresh database. Two batches, via
+      a new idempotent `EnsureNearExpiryDemoBatchesAsync` helper following the established
+      `Ensure*` backfill pattern (the existing `!Suppliers.Any()` bootstrap block never runs on an
+      already-seeded database):
+
+| Medicine | Batch | Qty | Expires in | Price |
+|---|---|---|---|---|
+| Zithromax 500mg | `B-2026-N1` | 60 | 45 days | ₱115.00 |
+| Forxiga 10mg | `B-2026-N2` | 40 | 20 days | ₱58.00 |
+
+      Both are deliberately **non-Rx and VAT-able**, so the promo can be exercised straight from
+      the POS without raising a prescription first, and so the Senior/PWD + BOGO combination is
+      reachable. Idempotency is **per batch number**, not a global "does any near-expiry stock
+      exist" check — a global check is wrong twice over: an unrelated leftover near-expiry batch
+      suppresses the demo stock, and it silently skips seeding on a fresh database too.
+- [x] **Verified end-to-end through the real endpoints** (`POST /Sales/CartPricing` then
+      `POST /Sales/Checkout` on a live server, with the on-screen figure compared against the
+      amount actually billed). For the task's canonical case the demo medicine was temporarily
+      priced at ₱50.00, then restored:
+
+| Case | Cart | On screen | Billed at checkout | |
+|---|---|---|---|---|
+| 1 | 4 × ₱50.00 near-expiry, standard | subtotal **₱100.00** (from ₱200.00) | **₱100.00** | OK |
+| 2 | same cart + Senior Citizen | net **₱71.43** (100.00 − 17.86 − 10.71) | **₱71.43** | OK |
+
+      Case 2's screen figure is `₱100.00` subtotal, `₱17.86` statutory (20% of the ₱89.29
+      VAT-exclusive base) and `₱10.71` VAT removed — the previously-broken ₱142.86. The
+      `SaleDetail` row independently confirms it: `qty=4, unit=50.00, bogo=100.00,
+      charged=100.00, batch=B-2026-N1`, and the audit trail reads
+      `gross ₱100.00 VAT ₱10.71` for the standard case and `₱100.00 / Senior` for the
+      statutory one.
+- [x] **Endpoint behaviour checked across quantities**, confirming the `ceil(n/2)` rule and that
+      pairing never leaks across batches: 1 unit → eligible, no discount, payable 115.00;
+      2 → payable 115.00; 3 → payable 230.00 (odd unit, paid); 4 → payable 230.00;
+      6 → payable 345.00. A non-near-expiry medicine correctly returns `bogoDiscount 0` with
+      empty batch fields, and mixed carts totalled per line.
+- [x] **Test rows purged** (4 test sales + details + billings + audit rows) and the demo batch
+      quantity restored to its seeded 60 after the tests consumed 16 units. The ₱50.00 test price
+      was reverted to ₱115.00. DB back to the documented baseline: **90 sales / 90 billings /
+      37 medicines / 142 audit rows**. App stopped; build 0 warnings / 0 errors with the edited
+      view forced to recompile.
+- [x] **Lesson recorded for next time:** `AuditLogs` has no `EntityId` column, so the
+      `DELETE ... WHERE EntityId = <id>` cleanup pattern silently no-ops and leaves orphan audit
+      rows behind. Purge them by `Id` (or by matching the sale number inside `Details`).
+
+**Still open (unchanged by this phase):**
+- [ ] Membership-fee sales show `Gross Total ₱0.00` on their receipt, because `GrossAmount` sums
+      `SaleDetails` and membership sales carry no detail rows. Pre-existing, unrelated to BOGO.
+- [ ] Audit rows 130–142 are orphans referencing Phase 4's deleted test sales. Left
+      deliberately — audit data was not deleted, only the test transactions.
+- [ ] `MedicineBatch` `ET1001` (medicine 39, 3 days left) is a leftover near-expiry batch from
+      earlier BOGO testing. Left in place; it is VAT-exempt **and** Rx-required, so it cannot be
+      sold from the POS without a prescription and does not interfere with the demo stock above.
+
+**Files touched:** `Controllers/SalesController.cs` (planner + `CartPricing` + `Checkout`
+refactor), `Views/Sales/Create.cshtml` (async cart render, server-driven subtotal, BOGO tag,
+savings row, failure guard), `Data/DbInitializer.cs` (demo batches), `PROGRESS.md`.

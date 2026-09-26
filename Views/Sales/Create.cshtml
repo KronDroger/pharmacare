@@ -101,9 +101,16 @@
 
         <!-- Cart Summary & Payment -->
         <div class="pos-cart-footer">
+            <div class="alert alert-danger py-1 px-2 mb-2 d-none" id="pricingError" style="font-size: 11.5px;">
+                <i class="bi bi-exclamation-triangle me-1"></i>Live pricing unavailable, so the cart cannot be totalled. Checkout is blocked — adjust the cart or reload the page.
+            </div>
             <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
                 <span class="text-muted">Subtotal:</span>
                 <span class="fw-semibold text-dark">₱<span id="subtotalDisplay">0.00</span></span>
+            </div>
+            <div class="d-flex justify-content-between mb-1 text-warning d-none" id="bogoRow" style="font-size: 13px;">
+                <span id="bogoLabel">BOGO Savings (near expiry):</span>
+                <span>-₱<span id="bogoDisplay">0.00</span></span>
             </div>
             <div class="d-flex justify-content-between mb-1 text-primary d-none" id="statDiscountRow" style="font-size: 13px;">
                 <span id="statDiscountLabel">Senior/PWD Discount (20%):</span>
@@ -188,12 +195,10 @@
     // Initial Rx pre-load if provided
     @if (rx != null)
     {
-        var rxNearExpiry = ViewBag.RxNearExpiry as Dictionary<int, (int Units, string? Batch, string? Expiry)>;
         foreach (var d in rx.Details)
         {
-            var prefix = rxNearExpiry != null && rxNearExpiry.TryGetValue(d.MedicineId, out var p) ? p : (0, null, null);
             <text>
-            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"), @(d.Medicine?.RxRequired == true ? "true" : "false"), @prefix.Units, '@prefix.Batch', '@prefix.Expiry');
+            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"), @(d.Medicine?.RxRequired == true ? "true" : "false"));
             </text>
         }
     }
@@ -303,7 +308,7 @@
                 '<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">' +
                 '<span class="fw-bold fs-5 text-success">₱' + price + '</span>' +
                 '<button type="button" class="btn btn-sm ' + (isOutOfStock ? 'btn-secondary' : 'btn-careplus') + ' px-3" ' + (isOutOfStock ? 'disabled' : '') +
-                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ', ' + (med.rxRequired ? 'true' : 'false') + ', ' + (med.nearExpiryUnits || 0) + ', \'' + (med.nearExpiryBatch || '') + '\', \'' + (med.nearExpiryDate || '') + '\')">' +
+                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ', ' + (med.rxRequired ? 'true' : 'false') + ')">' +
                 '<i class="bi bi-plus-lg me-1"></i> Add</button>' +
                 '</div>' +
                 '</div>' +
@@ -335,7 +340,7 @@
             '</div>';
     }
 
-    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false, rxRequired = false, nearExpiryUnits = 0, nearExpiryBatch = '', nearExpiryDate = '') {
+    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false, rxRequired = false) {
         const existing = cart.find(i => i.medId === medId);
         if (existing) {
             if (existing.qty + initialQty <= maxStock) {
@@ -345,7 +350,7 @@
             }
         } else {
             if (initialQty <= maxStock) {
-                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt, rxRequired: !!rxRequired, nearExpiryUnits: nearExpiryUnits || 0, nearExpiryBatch: nearExpiryBatch || '', nearExpiryDate: nearExpiryDate || '' });
+                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt, rxRequired: !!rxRequired });
             } else {
                 alert(`Cannot add. Only ${maxStock} units in stock.`);
             }
@@ -378,48 +383,143 @@
         renderCart();
     }
 
-    function renderCart() {
+    // Authoritative per-line pricing for the cart, keyed by medicineId.
+    //
+    // Populated only by refreshPricing() from POST Sales/CartPricing, which runs the
+    // same FEFO + BOGO pass that Checkout bills against. The client deliberately does
+    // NOT recompute these: recomputing quantity x price in JavaScript is what made the
+    // cart subtotal ignore the near-expiry BOGO halving and disagree with the receipt.
+    let linePricing = {};
+    let pricingFailed = false;
+    let pricingSeq = 0;
+
+    async function refreshPricing() {
+        const seq = ++pricingSeq;
+
+        if (cart.length === 0) {
+            linePricing = {};
+            pricingFailed = false;
+            return true;
+        }
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const resp = await fetch('@Url.Action("CartPricing", "Sales")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify(cart.map(i => ({ medicineId: i.medId, quantity: i.qty })))
+            });
+
+            if (!resp.ok) throw new Error('CartPricing ' + resp.status);
+
+            const data = await resp.json();
+            // Guard against an out-of-order response overwriting newer pricing.
+            if (seq !== pricingSeq) return true;
+
+            const next = {};
+            (data.lines || []).forEach(l => { next[l.medicineId] = l; });
+            linePricing = next;
+            pricingFailed = false;
+            return true;
+        } catch (err) {
+            if (seq !== pricingSeq) return true;
+            // Never fall back to quantity x price: that is precisely the bug this
+            // endpoint removes, and a confidently wrong total is worse than an
+            // explicit failure. Keep the last good pricing, flag the cart, and
+            // block checkout.
+            pricingFailed = true;
+            return false;
+        }
+    }
+
+    async function renderCart() {
         const emptyMsg = document.getElementById('emptyCartMsg');
         const cartList = document.getElementById('cartList');
         const btnCheckout = document.getElementById('btnCheckout');
+        const pricingError = document.getElementById('pricingError');
+
+        const priced = await refreshPricing();
 
         if (cart.length === 0) {
             emptyMsg.style.display = 'block';
             cartList.innerHTML = '';
             btnCheckout.disabled = true;
+            pricingError.classList.add('d-none');
         } else {
             emptyMsg.style.display = 'none';
-            btnCheckout.disabled = false;
+            btnCheckout.disabled = !priced;
+            pricingError.classList.toggle('d-none', priced);
 
             let html = '';
             cart.forEach(item => {
-                const itemTotal = (item.qty * item.price).toFixed(2);
+                const p = linePricing[item.medId];
 
-                // BOGO eligibility indicator only — no pricing is applied here.
-                // FEFO hits near-expiry batches first, so the first N units of this
-                // line come from near-expiry stock.
-                const bogoUnits = Math.min(item.qty, item.nearExpiryUnits || 0);
-                const bogoBadge = bogoUnits > 0
-                    ? '<div class="mt-1"><span class="badge rounded-pill text-bg-warning" style="font-size: 10.5px;">' +
-                      '<i class="bi bi-tag-fill me-1"></i>BOGO Eligible (near expiry)</span>' +
-                      '<span class="text-muted ms-1" style="font-size: 10.5px;">Batch ' + item.nearExpiryBatch +
-                      (item.nearExpiryDate ? ' &middot; exp ' + item.nearExpiryDate : '') +
-                      (bogoUnits < item.qty ? ' &middot; ' + bogoUnits + ' of ' + item.qty + ' units' : '') +
-                      '</span></div>'
-                    : '';
+                if (!p) {
+                    // No server figure for this line: show the unit price but no line
+                    // total rather than inventing a full-price one.
+                    html += `
+                        <div class="pos-item-card">
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${item.medName}</div>
+                                <div class="text-muted" style="font-size: 11.5px;">₱${item.price.toFixed(2)} each</div>
+                                <div class="text-danger" style="font-size: 10.5px;">price unavailable</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, -1)">-</button>
+                                <span class="fw-bold px-1" style="font-size: 13px; min-width: 22px; text-align: center;">${item.qty}</span>
+                                <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, 1)">+</button>
+                                <span class="text-muted ms-2" style="font-size: 12px; min-width: 55px; text-align: right;">—</span>
+                                <button type="button" class="btn btn-sm text-danger border-0 p-0 ms-1" onclick="removeFromCart(${item.medId})">
+                                    <i class="bi bi-x fs-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // bogoUnits > 0 with no discount yet means the line is BOGO-eligible
+                // but has not reached a pair yet (1 unit, or 1 of a split batch).
+                const bogoApplied = p.bogoDiscount > 0;
+                const bogoEligible = !bogoApplied && p.bogoUnits > 0;
+
+                const batchNote = 'Batch ' + p.bogoBatch +
+                    (p.bogoDate ? ' &middot; exp ' + p.bogoDate : '') +
+                    (bogoApplied && p.bogoUnits < p.quantity ? ' &middot; ' + p.bogoUnits + ' of ' + p.quantity + ' units BOGO' : '');
+
+                let bogoTag = '';
+                if (bogoApplied) {
+                    bogoTag = '<div class="mt-1"><span class="badge rounded-pill text-bg-warning" style="font-size: 10.5px;">' +
+                        '<i class="bi bi-tag-fill me-1"></i>BOGO Buy 1 Take 1 applied</span>' +
+                        '<span class="text-muted ms-1" style="font-size: 10.5px;">' + batchNote +
+                        ' &middot; saved ₱' + p.bogoDiscount.toFixed(2) + '</span></div>';
+                } else if (bogoEligible) {
+                    bogoTag = '<div class="mt-1"><span class="badge rounded-pill text-bg-warning" style="font-size: 10.5px;">' +
+                        '<i class="bi bi-tag-fill me-1"></i>BOGO Eligible (near expiry)</span>' +
+                        '<span class="text-muted ms-1" style="font-size: 10.5px;">' + batchNote + '</span></div>';
+                }
+
+                // Struck-through full price beside the reduced payable when BOGO fired.
+                const lineTotal = bogoApplied
+                    ? '<span class="text-muted text-decoration-line-through" style="font-size: 11.5px;">₱' + p.lineTotal.toFixed(2) + '</span> ' +
+                      '<span class="fw-bold text-success" style="font-size: 13px;">₱' + p.payable.toFixed(2) + '</span>'
+                    : '<span class="fw-bold text-dark" style="font-size: 13px;">₱' + p.payable.toFixed(2) + '</span>';
 
                 html += `
                     <div class="pos-item-card">
                         <div style="flex: 1; min-width: 0;">
                             <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${item.medName}</div>
-                            <div class="text-muted" style="font-size: 11.5px;">₱${item.price.toFixed(2)} each</div>
-                            ${bogoBadge}
+                            <div class="text-muted" style="font-size: 11.5px;">₱${p.unitPrice.toFixed(2)} each</div>
+                            ${bogoTag}
                         </div>
                         <div class="d-flex align-items-center gap-1">
                             <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, -1)">-</button>
                             <span class="fw-bold px-1" style="font-size: 13px; min-width: 22px; text-align: center;">${item.qty}</span>
                             <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, 1)">+</button>
-                            <span class="fw-bold text-dark ms-2" style="font-size: 13px; min-width: 55px; text-align: right;">₱${itemTotal}</span>
+                            <span class="ms-2" style="min-width: 55px; text-align: right;">${lineTotal}</span>
                             <button type="button" class="btn btn-sm text-danger border-0 p-0 ms-1" onclick="removeFromCart(${item.medId})">
                                 <i class="bi bi-x fs-5"></i>
                             </button>
@@ -464,16 +564,40 @@
     }
 
     function updateSummary() {
-        const subtotal = cart.reduce((sum, i) => sum + (i.qty * i.price), 0);
+        // All money figures below come from linePricing, i.e. the server's
+        // FEFO + BOGO pass. Summing them keeps the on-screen subtotal equal to what
+        // Checkout charges, including the near-expiry BOGO halving.
+        const priced = cart.map(i => linePricing[i.medId]).filter(Boolean);
+
+        const subtotal = priced.reduce((sum, p) => sum + Number(p.payable), 0);
+        const bogoSavings = priced.reduce((sum, p) => sum + Number(p.bogoDiscount), 0);
+
         document.getElementById('subtotalDisplay').innerText = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        if (bogoSavings > 0) {
+            document.getElementById('bogoRow').classList.remove('d-none');
+            document.getElementById('bogoDisplay').innerText = bogoSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } else {
+            document.getElementById('bogoRow').classList.add('d-none');
+        }
 
         const select = document.getElementById('customerSelect');
         const usePoints = document.getElementById('usePointsSwitch').checked;
         const availablePoints = parseInt(select.options[select.selectedIndex]?.dataset.points || '0', 10);
 
-        // VAT pools + statutory Senior/PWD discount (mirrors the server-side PricingService)
-        const vatable = cart.reduce((sum, i) => sum + (i.isVatExempt ? 0 : (i.qty * i.price)), 0);
-        const exempt = cart.reduce((sum, i) => sum + (i.isVatExempt ? (i.qty * i.price) : 0), 0);
+        // VAT pools + statutory Senior/PWD discount (mirrors the server-side PricingService).
+        // Built from the BOGO-reduced payable amounts, so a statutory discount on a
+        // BOGO line is taken on the amount actually owed — matching the server.
+        const vatable = cart.reduce((sum, i) => {
+            const p = linePricing[i.medId];
+            if (!p || i.isVatExempt) return sum;
+            return sum + Number(p.payable);
+        }, 0);
+        const exempt = cart.reduce((sum, i) => {
+            const p = linePricing[i.medId];
+            if (!p || !i.isVatExempt) return sum;
+            return sum + Number(p.payable);
+        }, 0);
         const discountType = document.getElementById('discountTypeSelect').value;
 
         let statDiscount = 0;
@@ -490,11 +614,8 @@
 
         // Senior/PWD: VAT is not collected on a statutory-discount purchase and the 20%
         // discount is taken on the VAT-exclusive amount, so the VAT component is removed
-        // from the amount owed. Mirrors PricingService + Checkout on the server.
-        //
-        // NOTE: `vatable`/`subtotal` here are still built from full line price, so this
-        // display does not yet reflect the near-expiry BOGO reduction (known POS subtotal
-        // gap). The VAT and statutory rules themselves now match the server.
+        // from the amount owed. Mirrors PricingService + Checkout on the server, and now
+        // runs on the BOGO-reduced payable amounts rather than full line price.
         const vatAmount = Math.round((vatable / 1.12) * 0.12 * 100) / 100;
         const isStatutory = (discountType === 'Senior' || discountType === 'Pwd');
 
