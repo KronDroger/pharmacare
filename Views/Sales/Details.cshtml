@@ -10,6 +10,11 @@
     var memberTierName = Model.AppliedDiscountSource?.StartsWith("Membership:") == true
         ? Model.AppliedDiscountSource!.Substring("Membership:".Length)
         : null;
+    // Near-expiry "Buy 1 Take 1" lines. BOGO reduces the gross, so the receipt shows
+    // the full-price subtotal, then one deduction line per affected batch, then the
+    // BOGO-reduced gross — which is what makes the line items add up correctly.
+    var bogoLines = Model.Details.Where(d => d.BogoDiscountAmount > 0).ToList();
+    var itemSubtotal = Model.Details.Sum(d => d.LineTotal);
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
@@ -108,10 +113,26 @@
                         <div class="text-muted" style="font-size: 10px;">
                             Batch: @(d.Batch?.BatchNumber ?? "FIFO-Auto")
                         </div>
+                        @if (d.BogoDiscountAmount > 0)
+                        {
+                            <div style="font-size: 10px; color: var(--cp-warning); font-weight: 600;">
+                                <i class="bi bi-tag-fill me-1"></i>BOGO Buy 1 Take 1 — saved ₱@d.BogoDiscountAmount.ToString("N2")
+                            </div>
+                        }
                     </td>
                     <td class="py-1 num">@d.Quantity.ToString("N0")</td>
                     <td class="py-1 num">₱@d.UnitPrice.ToString("N2")</td>
-                    <td class="py-1 num fw-bold">₱@d.LineTotal.ToString("N2")</td>
+                    <td class="py-1 num fw-bold">
+                        @if (d.BogoDiscountAmount > 0)
+                        {
+                            <span class="text-decoration-line-through text-muted" style="font-size: 10px;">₱@d.LineTotal.ToString("N2")</span><br />
+                            <span>₱@d.ChargedTotal.ToString("N2")</span>
+                        }
+                        else
+                        {
+                            <span>₱@d.LineTotal.ToString("N2")</span>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
@@ -119,6 +140,20 @@
 
     <!-- Totals & Breakdown -->
     <div class="border-top pt-2 mt-2" style="font-size: 12px;">
+        @if (bogoLines.Count > 0)
+        {
+            <div class="d-flex justify-content-between mb-1">
+                <span>Subtotal (items at full price):</span>
+                <span>₱@itemSubtotal.ToString("N2")</span>
+            </div>
+            foreach (var bogo in bogoLines)
+            {
+                <div class="d-flex justify-content-between mb-1" style="color: var(--cp-warning);">
+                    <span><i class="bi bi-tag-fill me-1"></i>BOGO applied &mdash; Batch @(bogo.Batch?.BatchNumber ?? "—") (near expiry)</span>
+                    <span>-₱@bogo.BogoDiscountAmount.ToString("N2")</span>
+                </div>
+            }
+        }
         <div class="d-flex justify-content-between mb-1">
             <span>Gross Total:</span>
             <span>₱@Model.GrossAmount.ToString("N2")</span>

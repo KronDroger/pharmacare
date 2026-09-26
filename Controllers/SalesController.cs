@@ -553,17 +553,51 @@ namespace CarePlusPharmacy.Controllers
 
                 // Record compliance audit log
                 var user = await _userManager.GetUserAsync(User);
+                var operatorName = user?.FullName ?? user?.UserName ?? "Staff";
+                var operatorRole = User.IsInRole("Admin") ? "Admin" : (User.IsInRole("Pharmacist") ? "Pharmacist" : "Cashier");
                 _context.AuditLogs.Add(new AuditLog
                 {
                     Timestamp = DateTime.Now,
                     UserId = user?.Id,
-                    UserName = user?.FullName ?? user?.UserName ?? "Staff",
-                    UserRole = User.IsInRole("Admin") ? "Admin" : (User.IsInRole("Pharmacist") ? "Pharmacist" : "Cashier"),
+                    UserName = operatorName,
+                    UserRole = operatorRole,
                     Action = "POS_SALE_COMPLETED",
                     Module = "Sales & POS",
                     Details = $"Processed Sale #{sale.Id} ({sale.PaymentMethod}): ₱{finalAmount:N2} gross ₱{grossTotal:N2} VAT ₱{sale.VatAmount:N2}{(sale.DiscountType != SaleDiscountType.None ? $", {sale.DiscountType} ID {sale.DiscountIdNumber}" : (sale.AppliedDiscountSource != "None" ? $", {sale.AppliedDiscountSource}" : ""))}, Issued {billing.InvoiceNumber}",
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
                 });
+
+                // Separate audit entry for the near-expiry promo so it is searchable on its
+                // own (Action = BOGO_APPLIED) rather than buried in the sale's details.
+                var bogoDetails = saleDetails.Where(d => d.BogoDiscountAmount > 0).ToList();
+                if (bogoDetails.Count > 0)
+                {
+                    var fullPriceTotal = saleDetails.Sum(d => d.LineTotal);
+                    var bogoSaved = bogoDetails.Sum(d => d.BogoDiscountAmount);
+                    var batchBreakdown = string.Join("; ", bogoDetails.Select(d =>
+                    {
+                        var batchNo = medicines.FirstOrDefault(m => m.Id == d.MedicineId)?
+                            .Batches.FirstOrDefault(b => b.Id == d.BatchId)?.BatchNumber ?? "unknown";
+                        return $"{batchNo} {d.Quantity}u -{d.BogoDiscountAmount:N2}";
+                    }));
+
+                    var bogoAudit = $"BOGO (Buy 1 Take 1) applied to Sale #{sale.Id} / {billing.InvoiceNumber}: "
+                        + $"{bogoDetails.Sum(d => d.Quantity)} near-expiry unit(s) across {bogoDetails.Count} batch(es), "
+                        + $"saved {bogoSaved:N2} (gross {grossTotal:N2} of {fullPriceTotal:N2} at list price). Batches: {batchBreakdown}";
+                    if (bogoAudit.Length > 500) bogoAudit = bogoAudit.Substring(0, 497) + "...";
+
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        Timestamp = DateTime.Now,
+                        UserId = user?.Id,
+                        UserName = operatorName,
+                        UserRole = operatorRole,
+                        Action = "BOGO_APPLIED",
+                        Module = "Sales & POS",
+                        Details = bogoAudit,
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    });
+                }
 
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
@@ -575,6 +609,7 @@ namespace CarePlusPharmacy.Controllers
                     invoiceNumber = billing.InvoiceNumber,
                     totalAmount = finalAmount,
                     discountAmount = discountAmount,
+                    bogoDiscountAmount = saleDetails.Sum(d => d.BogoDiscountAmount),
                     cashTendered = cashTendered,
                     changeAmount = changeAmount,
                     pointsEarned = pointsEarned,

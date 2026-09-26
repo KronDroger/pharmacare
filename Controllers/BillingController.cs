@@ -92,6 +92,9 @@ namespace CarePlusPharmacy.Controllers
             var billing = await _context.Billings
                 .Include(b => b.Sale).ThenInclude(s => s!.Customer)
                 .Include(b => b.Sale).ThenInclude(s => s!.Details).ThenInclude(d => d.Medicine)
+                // Batch is needed by the invoice to print the near-expiry batch number
+                // on the "BOGO applied" line.
+                .Include(b => b.Sale).ThenInclude(s => s!.Details).ThenInclude(d => d.Batch)
                 .FirstOrDefaultAsync(b => b.Id == id);
             if (billing == null) return NotFound();
             return View(billing);
