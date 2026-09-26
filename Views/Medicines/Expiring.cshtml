@@ -12,6 +12,8 @@
     decimal warningValue = ViewBag.WarningValuation ?? 0m;
     int safeCount = ViewBag.SafeCount ?? 0;
     decimal safeValue = ViewBag.SafeValuation ?? 0m;
+    int nearExpiryCount = ViewBag.NearExpiryCount ?? 0;
+    decimal nearExpiryValue = ViewBag.NearExpiryValuation ?? 0m;
     string currentTab = ViewBag.CurrentTab ?? "all";
 
     string BuildTabUrl(string tabName)
@@ -87,6 +89,19 @@
             <span class="text-success fw-bold">Safe</span> shelf lifespan
         </div>
     </div>
+
+    <div class="stat-card">
+        <div class="stat-icon icon-amber">
+            <i class="bi bi-tag-fill"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Near Expiry (BOGO Eligible)</div>
+            <div class="stat-value text-warning">@nearExpiryCount <span style="font-size: 13px; font-weight: 500; color: #7b809a;">batches</span></div>
+        </div>
+        <div class="stat-footer">
+            <span class="text-warning fw-bold">Buy 1 Take 1</span> &middot; ₱@nearExpiryValue.ToString("N2") recoverable
+        </div>
+    </div>
 </div>
 
 <!-- Filter Pills & Toolbar -->
@@ -97,6 +112,9 @@
         <a href="@BuildTabUrl("critical")" class="btn btn-sm @(currentTab == "critical" ? "btn-warning text-dark" : "btn-outline-warning")">Critical &le; 30d (@criticalCount)</a>
         <a href="@BuildTabUrl("warning")" class="btn btn-sm @(currentTab == "warning" ? "btn-secondary" : "btn-outline-secondary")">Warning &le; 90d (@warningCount)</a>
         <a href="@BuildTabUrl("safe")" class="btn btn-sm @(currentTab == "safe" ? "btn-success" : "btn-outline-success")">Safe Stock (@safeCount)</a>
+        <a href="@BuildTabUrl("nearexpiry")" class="btn btn-sm @(currentTab == "nearexpiry" ? "btn-warning text-dark" : "btn-outline-warning")">
+            <i class="bi bi-tag me-1"></i>Near Expiry &middot; BOGO Eligible (@nearExpiryCount)
+        </a>
     </div>
     <div class="d-flex gap-2">
         <a asp-action="Index" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
@@ -130,6 +148,7 @@
                     <th class="num">Batch Valuation</th>
                     <th>Expiry Date</th>
                     <th>Status Tier</th>
+                    <th>BOGO Promo</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -137,7 +156,7 @@
                 @if (!Model.Any())
                 {
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-5">
+                        <td colspan="9" class="text-center text-muted py-5">
                             No medicine batches registered in inventory.
                         </td>
                     </tr>
@@ -224,6 +243,19 @@
                             else
                             {
                                 <span class="text-success fw-semibold"><i class="bi bi-shield-check me-1"></i>Healthy</span>
+                            }
+                        </td>
+                        <td>
+                            @if (b.IsNearExpiry)
+                            {
+                                <span class="badge rounded-pill text-bg-warning">
+                                    <i class="bi bi-tag-fill me-1"></i>BOGO Eligible
+                                </span>
+                                <div class="text-muted" style="font-size: 11px;">Near expiry &le; @CarePlusPharmacy.Models.MedicineBatch.NearExpiryThresholdDays days</div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">&mdash;</span>
                             }
                         </td>
                         <td class="text-end">

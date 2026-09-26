@@ -128,6 +128,14 @@ namespace CarePlusPharmacy.Controllers
             ViewBag.SafeCount = await safeQuery.CountAsync();
             ViewBag.SafeValuation = await safeQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
 
+            // Near Expiry (BOGO Eligible): mirrors MedicineBatch.IsNearExpiry, which is a computed
+            // C# property and therefore cannot be translated to SQL. Must stay in sync with it.
+            var nearExpiryQuery = baseQuery.Where(b => b.Quantity > 0
+                && b.ExpiryDate > today
+                && b.ExpiryDate <= today.AddDays(MedicineBatch.NearExpiryThresholdDays));
+            ViewBag.NearExpiryCount = await nearExpiryQuery.CountAsync();
+            ViewBag.NearExpiryValuation = await nearExpiryQuery.SumAsync(b => (decimal?)(b.Quantity * b.Medicine!.UnitPrice)) ?? 0m;
+
             // Filter by selected tab before paging
             var filteredQuery = tab switch
             {
@@ -135,6 +143,7 @@ namespace CarePlusPharmacy.Controllers
                 "critical" => criticalQuery,
                 "warning" => warningQuery,
                 "safe" => safeQuery,
+                "nearexpiry" => nearExpiryQuery,
                 _ => baseQuery
             };
 
