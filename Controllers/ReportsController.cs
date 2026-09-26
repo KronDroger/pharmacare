@@ -80,7 +80,8 @@ namespace CarePlusPharmacy.Controllers
                     MedicineName = g.Key,
                     Category = g.FirstOrDefault()?.Medicine?.Category ?? "General",
                     UnitsSold = g.Sum(d => d.Quantity),
-                    Revenue = g.Sum(d => d.Quantity * d.UnitPrice)
+                    // Net of the near-expiry BOGO giveaway so revenue matches what was billed.
+                    Revenue = g.Sum(d => (d.Quantity * d.UnitPrice) - d.BogoDiscountAmount)
                 })
                 .OrderByDescending(t => t.Revenue);
 

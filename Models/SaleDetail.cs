@@ -27,7 +27,21 @@ namespace CarePlusPharmacy.Models
         [Display(Name = "Unit Price (₱)")]
         public decimal UnitPrice { get; set; }
 
+        // "Buy 1 Take 1" saving on this line, in pesos. Non-zero only when the line
+        // was dispensed from a near-expiry batch (MedicineBatch.IsNearExpiry), where
+        // every 2 units taken from that batch are charged for only 1.
+        // Quantity and UnitPrice always hold the true dispensed value at full price,
+        // so inventory and audit remain truthful; this column records the giveaway.
+        [Column(TypeName = "decimal(10,2)")]
+        [Display(Name = "BOGO Discount (₱)")]
+        public decimal BogoDiscountAmount { get; set; } = 0m;
+
+        // Full dispensed value of the line (what the goods are worth at list price).
         [NotMapped]
         public decimal LineTotal => Quantity * UnitPrice;
+
+        // What the customer is actually charged for this line after BOGO.
+        [NotMapped]
+        public decimal ChargedTotal => LineTotal - BogoDiscountAmount;
     }
 }

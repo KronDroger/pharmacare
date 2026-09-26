@@ -66,8 +66,10 @@ namespace CarePlusPharmacy.Controllers
                 baseQuery = baseQuery.Where(s => s.SaleDate < toDate);
             }
 
-            // KPIs reflect the filtered ledger (independent of page number)
-            var allSalesData = await baseQuery.Select(s => new { Discount = s.DiscountAmount, Vat = s.VatAmount, Gross = s.Details.Sum(d => (decimal?)(d.Quantity * d.UnitPrice)) ?? 0m, Statutory = s.DiscountType == SaleDiscountType.Senior || s.DiscountType == SaleDiscountType.Pwd }).ToListAsync();
+            // KPIs reflect the filtered ledger (independent of page number).
+            // Gross uses ChargedTotal so the revenue KPI nets off the near-expiry
+            // BOGO giveaway instead of overstating it.
+            var allSalesData = await baseQuery.Select(s => new { Discount = s.DiscountAmount, Vat = s.VatAmount, Gross = s.Details.Sum(d => (decimal?)((d.Quantity * d.UnitPrice) - d.BogoDiscountAmount)) ?? 0m, Statutory = s.DiscountType == SaleDiscountType.Senior || s.DiscountType == SaleDiscountType.Pwd }).ToListAsync();
             ViewBag.TotalRevenueAll = allSalesData.Sum(s => Math.Max(0, s.Gross - (s.Statutory ? s.Vat : 0) - s.Discount));
             ViewBag.TotalCountAll = await baseQuery.CountAsync();
             ViewBag.TotalItemsAll = await baseQuery.SelectMany(s => s.Details).SumAsync(d => (int?)d.Quantity) ?? 0;
@@ -315,30 +317,42 @@ namespace CarePlusPharmacy.Controllers
                         });
                     }
 
-                    // Deduct stock FIFO — expired batches are never dispensed.
+                    // Deduct stock FEFO — expired batches are never dispensed.
                     int remainingToDeduct = item.Quantity;
-                    var activeBatches = medicine.Batches
-                        .Where(b => b.Quantity > 0 && b.ExpiryDate >= DateTime.Today)
-                        .OrderBy(b => b.ExpiryDate)
-                        .ThenBy(b => b.Id)
-                        .ToList();
+                    var activeBatches = FefoOrder(medicine);
 
                     foreach (var batch in activeBatches)
                     {
                         if (remainingToDeduct <= 0) break;
                         int take = Math.Min(batch.Quantity, remainingToDeduct);
+
+                        // Must be read BEFORE the deduction: draining a batch sets its
+                        // Quantity to 0, which would flip IsNearExpiry to false and
+                        // silently lose the discount on a fully-consumed near-expiry batch.
+                        bool isNearExpiry = batch.IsNearExpiry;
+
                         batch.Quantity -= take;
                         remainingToDeduct -= take;
+
+                        // Buy 1 Take 1 (near-expiry promo): every 2 units taken from a
+                        // near-expiry batch are charged for only 1, rounded down, so
+                        // payable units = ceil(take / 2) = (take + 1) / 2.
+                        // 2 units -> pay 1, 3 -> pay 2, 4 -> pay 2. Fresh batches are
+                        // charged in full, and pairing never spans two batches.
+                        int payableUnits = isNearExpiry ? (take + 1) / 2 : take;
+                        var lineGross = take * medicine.UnitPrice;
+                        var bogoSaved = (take - payableUnits) * medicine.UnitPrice;
 
                         saleDetails.Add(new SaleDetail
                         {
                             MedicineId = medicine.Id,
                             BatchId = batch.Id,
                             Quantity = take,
-                            UnitPrice = medicine.UnitPrice
+                            UnitPrice = medicine.UnitPrice,
+                            BogoDiscountAmount = bogoSaved
                         });
 
-                        grossTotal += take * medicine.UnitPrice;
+                        grossTotal += lineGross - bogoSaved;
                     }
                 }
 
@@ -424,11 +438,13 @@ namespace CarePlusPharmacy.Controllers
                 }
 
                 // Price the sale (server-side VAT + statutory discount) — the client
-                // never dictates totals.
+                // never dictates totals. Lines use ChargedTotal, so the near-expiry
+                // BOGO reduction lowers the VAT base as well as the gross: VAT is due
+                // only on the amount actually charged.
                 var priceLines = saleDetails.Select(d =>
                 {
                     var med = medicines.FirstOrDefault(m => m.Id == d.MedicineId);
-                    return new PriceLine(d.Quantity * d.UnitPrice, med?.IsVatExempt ?? false);
+                    return new PriceLine(d.ChargedTotal, med?.IsVatExempt ?? false);
                 });
                 var price = _pricingService.Compute(priceLines, model.DiscountType);
 

@@ -79,8 +79,19 @@ namespace CarePlusPharmacy.Models
 
         public ICollection<SaleDetail> Details { get; set; } = new List<SaleDetail>();
 
+        // Total "Buy 1 Take 1" giveaway on this sale, summed from the lines that were
+        // dispensed from near-expiry batches.
+        [NotMapped]
+        [Display(Name = "BOGO Savings (₱)")]
+        public decimal BogoDiscountAmount => Details?.Sum(d => d.BogoDiscountAmount) ?? 0;
+
+        // Gross amount actually billed for the goods, i.e. after the BOGO reduction
+        // but before the Senior/PWD or membership percentage discount and any points
+        // redemption. BOGO is a pricing rule on the near-expiry units themselves, so
+        // it reduces the gross (and the VAT base) rather than sitting in DiscountAmount
+        // alongside the percentage discounts.
         [Display(Name = "Gross Total")]
-        public decimal GrossAmount => Details?.Sum(d => d.Quantity * d.UnitPrice) ?? 0;
+        public decimal GrossAmount => Details?.Sum(d => d.ChargedTotal) ?? 0;
 
         [Display(Name = "Net Total")]
         public decimal TotalAmount => (DiscountType == SaleDiscountType.Senior || DiscountType == SaleDiscountType.Pwd)
