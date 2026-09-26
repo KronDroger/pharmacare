@@ -164,6 +164,16 @@
                 <span>@(Model.DiscountType == CarePlusPharmacy.Models.SaleDiscountType.Senior ? "Senior Citizen" : "PWD") Discount (20%)@(string.IsNullOrEmpty(Model.DiscountIdNumber) ? "" : $" · ID {Model.DiscountIdNumber}"):</span>
                 <span>-₱@statDiscount.ToString("N2")</span>
             </div>
+            @* VAT is not collected on a statutory-discount purchase (RA 9994 / 9257 /
+               10754). TotalAmount subtracts it, so print the line or the column will
+               not visibly reconcile. *@
+            @if (Model.VatAmount > 0)
+            {
+                <div class="d-flex justify-content-between mb-1 text-primary">
+                    <span>12% VAT waived (@(Model.DiscountType == CarePlusPharmacy.Models.SaleDiscountType.Senior ? "Senior Citizen" : "PWD")):</span>
+                    <span>-₱@Model.VatAmount.ToString("N2")</span>
+                </div>
+            }
         }
         @if (memberDiscount > 0)
         {

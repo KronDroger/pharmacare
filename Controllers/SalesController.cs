@@ -483,27 +483,62 @@ namespace CarePlusPharmacy.Controllers
                             appliedSource = $"Membership:{membershipTier!.Name}";
                             price.DiscountAmount = membershipDiscount;
                         }
-
-                        // 1 point = ₱1.00 discount (capped at the remaining balance
-                        // after the applied discount, and at available points)
-                        decimal payableBeforePoints = Math.Max(0, grossTotal - price.DiscountAmount);
-                        if (model.PointsToRedeem > 0)
-                        {
-                            int maxRedeemable = Math.Min(customer.LoyaltyPoints, (int)payableBeforePoints);
-                            int actualRedeem = Math.Min(model.PointsToRedeem, maxRedeemable);
-                            discountAmount = actualRedeem;
-                            customer.LoyaltyPoints -= actualRedeem;
-                            pointsRedeemed = actualRedeem;
-                        }
-
-                        // Earn 1 point per ₱100 spent on the final net amount
-                        decimal netPayable = Math.Max(0, grossTotal - price.DiscountAmount - discountAmount);
-                        pointsEarned = (int)(netPayable / 100);
-                        customer.LoyaltyPoints += pointsEarned;
                     }
                 }
 
-                finalAmount = Math.Max(0, grossTotal - price.DiscountAmount - discountAmount);
+                // Senior/PWD (RA 9994 / 9257 / 10754): VAT is not collected on a
+                // statutory-discount purchase and the 20% discount is taken on the
+                // VAT-exclusive amount, so the VAT component is removed from the amount
+                // owed. Sale.TotalAmount encodes the same rule, so deriving the payable
+                // figure here brings the amount actually charged back in line with the
+                // amount the ledger reports — previously Checkout left the VAT in and
+                // overcharged every Senior/PWD sale by the VAT amount.
+                //
+                // Keyed off appliedDiscountType, NOT model.DiscountType: when a membership
+                // tier discount out-grows the 20% statutory one, the membership wins and
+                // appliedDiscountType is reset to None, so the sale is no longer a
+                // statutory sale and the VAT stays in the total.
+                //
+                // Computed once, after the membership comparison above, and reused by the
+                // points cap, the points-earned calculation and finalAmount so those
+                // three can never drift apart. This matters once BOGO lowers the gross:
+                // a cap that ignored the BOGO reduction (or the VAT waiver) would let
+                // points overshoot the real total and burn loyalty points for no
+                // discount at all.
+                var isStatutoryDiscountSale = appliedDiscountType == SaleDiscountType.Senior
+                    || appliedDiscountType == SaleDiscountType.Pwd;
+
+                var payableBeforePoints = Math.Max(0, isStatutoryDiscountSale
+                    ? grossTotal - price.VatAmount - price.DiscountAmount
+                    : grossTotal - price.DiscountAmount);
+
+                if (customer != null)
+                {
+                    // 1 point = ₱1.00 discount (capped at the remaining balance
+                    // after the applied discount, and at available points)
+                    if (model.PointsToRedeem > 0)
+                    {
+                        int maxRedeemable = Math.Min(customer.LoyaltyPoints, (int)payableBeforePoints);
+                        int actualRedeem = Math.Min(model.PointsToRedeem, maxRedeemable);
+                        discountAmount = actualRedeem;
+                        customer.LoyaltyPoints -= actualRedeem;
+                        pointsRedeemed = actualRedeem;
+                    }
+
+                    // Earn 1 point per ₱100 spent on the final net amount
+                    decimal netPayable = Math.Max(0, payableBeforePoints - discountAmount);
+                    pointsEarned = (int)(netPayable / 100);
+                    customer.LoyaltyPoints += pointsEarned;
+                }
+
+                // What the customer actually pays. Deriving it from payableBeforePoints
+                // (see above) means the amount charged, the points cap and the points
+                // earned can never disagree — and it matches Sale.TotalAmount, which
+                // applies the same Senior/PWD VAT-waiver rule. Before this, Checkout left
+                // the VAT in the payable total and overcharged every Senior/PWD sale by
+                // the VAT amount, while the ledger reported the lower figure.
+                finalAmount = Math.Max(0, payableBeforePoints - discountAmount);
+
                 cashTendered = model.CashTendered >= finalAmount ? model.CashTendered : finalAmount;
                 changeAmount = Math.Max(0, cashTendered - finalAmount);
 

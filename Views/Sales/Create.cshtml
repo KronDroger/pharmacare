@@ -488,8 +488,22 @@
             document.getElementById('statDiscountRow').classList.add('d-none');
         }
 
+        // Senior/PWD: VAT is not collected on a statutory-discount purchase and the 20%
+        // discount is taken on the VAT-exclusive amount, so the VAT component is removed
+        // from the amount owed. Mirrors PricingService + Checkout on the server.
+        //
+        // NOTE: `vatable`/`subtotal` here are still built from full line price, so this
+        // display does not yet reflect the near-expiry BOGO reduction (known POS subtotal
+        // gap). The VAT and statutory rules themselves now match the server.
+        const vatAmount = Math.round((vatable / 1.12) * 0.12 * 100) / 100;
+        const isStatutory = (discountType === 'Senior' || discountType === 'Pwd');
+
+        // Amount owed before points — the same figure the server caps points against, so
+        // the switch can never offer more points than Checkout will actually honour
+        // (which previously burned points for no extra discount).
+        const payableBeforePoints = Math.max(0, subtotal - statDiscount - (isStatutory ? vatAmount : 0));
+
         let discount = 0;
-        const payableBeforePoints = Math.max(0, subtotal - statDiscount);
         if (usePoints && availablePoints > 0) {
             discount = Math.min(availablePoints, Math.floor(payableBeforePoints));
             document.getElementById('discountRow').classList.remove('d-none');
@@ -498,7 +512,7 @@
             document.getElementById('discountRow').classList.add('d-none');
         }
 
-        const netTotal = Math.max(0, subtotal - statDiscount - discount);
+        const netTotal = Math.max(0, payableBeforePoints - discount);
         document.getElementById('netTotalDisplay').innerText = netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         updateChange();
