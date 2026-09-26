@@ -292,7 +292,7 @@ Automatic promo that discounts near-expiring stock out of inventory instead of w
 - **There is no `Active` membership in the seed** — the only enrollment (`CustomerMemberships.Id = 23`, customer 54, Health Plus VIP 15%) has `Status = 2` (`Cancelled`). Membership-stacking tests must activate it temporarily and restore it.
 - MariaDB/MySQL here rejects the SQL Server-style ternary (`? :`) — use `IF(cond, a, b)`. Also `Sale.TotalAmount`, `GrossAmount`, `ChargedTotal` and `BogoDiscountAmount` are `[NotMapped]`, so they are **not** columns and cannot be selected; recompute them in SQL when asserting ledger invariants.
 
-## Phase 33: BOGO — Phase 6 of 6: Discount-stacking verification + statutory VAT fix (done, commit `PENDING`)
+## Phase 33: BOGO — Phase 6 of 6: Discount-stacking verification + statutory VAT fix (done, commit `b75d3cb`)
 - [x] **Verified the intended stacking order** (BOGO halves first, then the percentage applies to the already-reduced amount) across an 8-case matrix driven through the real `POST /Sales/Checkout` endpoint and asserted against hand calculations. Every case matched:
 
 | # | Cart | Expected | Charged | |
