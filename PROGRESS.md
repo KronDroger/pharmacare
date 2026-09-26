@@ -265,7 +265,7 @@ Automatic promo that discounts near-expiring stock out of inventory instead of w
 - [x] Per-line independence: 2-line cart ₱50×4 + ₱80×3 = **₱260.00**, matching hand calculation.
 - [x] Data integrity: for every test sale `Σ(ChargedTotal) == VatableSales == Billings.AmountDue`, and the receipt page shows a consistent Gross / Total Amount Due. Test medicines, batches and the 13 test sales purged (90 sales / 90 billings intact); build 0 warn / 0 err.
 
-## Phase 32: BOGO — Phase 5 of 6: Receipt/invoice BOGO line + audit trail (done, commit `PENDING`)
+## Phase 32: BOGO — Phase 5 of 6: Receipt/invoice BOGO line + audit trail (done, commit `a5068a2`)
 - [x] `Views/Sales/Details.cshtml` (receipt) and `Views/Billing/Details.cshtml` (tax invoice) each render a per-batch deduction line reading **"BOGO applied — Batch `<number>` (near expiry)"** with the amount saved, prefixed with a `bi-tag-fill` icon in `--cp-warning`.
 - [x] **Closes the Phase 4 gap where receipt lines did not add up to the total.** When a BOGO line exists, a `Subtotal (items at full price)` row is now printed first, so the arithmetic is visible: `₱200.00 − ₱100.00 = ₱100.00` gross. Previously the line items showed full price while Gross below was already halved.
 - [x] BOGO line items show the full price struck through above the charged amount, plus an inline `BOGO Buy 1 Take 1 — saved ₱X` badge, so the saving is legible at line level and not only in the totals block.
