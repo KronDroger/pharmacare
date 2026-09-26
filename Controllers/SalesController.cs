@@ -112,6 +112,30 @@ namespace CarePlusPharmacy.Controllers
             return View(sales);
         }
 
+        // FEFO (First-Expired, First-Out) batch order. MUST stay identical to the
+        // deduction order in Checkout, otherwise the POS would badge a batch that
+        // is not the one actually dispensed. Expired stock is never included.
+        private static List<MedicineBatch> FefoOrder(Medicine medicine)
+        {
+            return medicine.Batches
+                .Where(b => b.Quantity > 0 && b.ExpiryDate >= DateTime.Today)
+                .OrderBy(b => b.ExpiryDate)
+                .ThenBy(b => b.Id)
+                .ToList();
+        }
+
+        // Batches the FEFO pass will hit before reaching fresh stock, and their
+        // unit count. Because FEFO sorts by ascending expiry, near-expiry batches
+        // form a contiguous prefix of the order, so the first N units of any cart
+        // quantity are dispensed from them. Used for the POS badge only in this
+        // phase; the actual BOGO pricing is applied server-side at Checkout.
+        private static (int Units, string? Batch, string? Expiry) NearExpiryPrefix(Medicine medicine)
+        {
+            var nearExpiry = FefoOrder(medicine).Where(b => b.IsNearExpiry).ToList();
+            if (nearExpiry.Count == 0) return (0, null, null);
+            return (nearExpiry.Sum(b => b.Quantity), nearExpiry[0].BatchNumber, nearExpiry[0].ExpiryDate.ToString("yyyy-MM-dd"));
+        }
+
         // Full-screen / Interactive POS Terminal
         public async Task<IActionResult> Create(int? prescriptionId)
         {
@@ -130,6 +154,18 @@ namespace CarePlusPharmacy.Controllers
                     .Include(p => p.Details).ThenInclude(d => d.Medicine)
                     .FirstOrDefaultAsync(p => p.Id == prescriptionId.Value);
                 ViewBag.Prescription = rx;
+
+                // Near-expiry prefix for the Rx lines the POS pre-loads into the cart,
+                // so pre-loaded lines get the same badge as catalog-added lines.
+                if (rx != null)
+                {
+                    var rxMedicineIds = rx.Details.Select(d => d.MedicineId).Distinct().ToList();
+                    var rxMedicines = await _context.Medicines
+                        .Include(m => m.Batches)
+                        .Where(m => rxMedicineIds.Contains(m.Id))
+                        .ToListAsync();
+                    ViewBag.RxNearExpiry = rxMedicines.ToDictionary(m => m.Id, NearExpiryPrefix);
+                }
             }
 
             return View();
@@ -167,21 +203,30 @@ namespace CarePlusPharmacy.Controllers
                 .Take(pageSize)
                 .ToListAsync();
 
-            var data = items.Select(m => new
+            var data = items.Select(m =>
             {
-                id = m.Id,
-                name = m.Name,
-                genericName = m.GenericName,
-                category = m.Category,
-                manufacturer = m.Manufacturer,
-                unitPrice = m.UnitPrice,
-                reorderLevel = m.ReorderLevel,
-                totalStock = m.TotalStock,
-                sellableStock = m.SellableStock,
-                expiredStock = m.ExpiredStock,
-                nearestExpiry = m.NearestExpiry?.ToString("yyyy-MM-dd"),
-                isVatExempt = m.IsVatExempt,
-                rxRequired = m.RxRequired
+                // Server-side FEFO projection so the POS badge matches the batch
+                // that Checkout will actually deduct from.
+                var nearExpiry = NearExpiryPrefix(m);
+                return new
+                {
+                    id = m.Id,
+                    name = m.Name,
+                    genericName = m.GenericName,
+                    category = m.Category,
+                    manufacturer = m.Manufacturer,
+                    unitPrice = m.UnitPrice,
+                    reorderLevel = m.ReorderLevel,
+                    totalStock = m.TotalStock,
+                    sellableStock = m.SellableStock,
+                    expiredStock = m.ExpiredStock,
+                    nearestExpiry = m.NearestExpiry?.ToString("yyyy-MM-dd"),
+                    isVatExempt = m.IsVatExempt,
+                    rxRequired = m.RxRequired,
+                    nearExpiryUnits = nearExpiry.Units,
+                    nearExpiryBatch = nearExpiry.Batch,
+                    nearExpiryDate = nearExpiry.Expiry
+                };
             }).ToList();
 
             return Json(new

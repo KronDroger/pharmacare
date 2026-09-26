@@ -188,10 +188,12 @@
     // Initial Rx pre-load if provided
     @if (rx != null)
     {
+        var rxNearExpiry = ViewBag.RxNearExpiry as Dictionary<int, (int Units, string? Batch, string? Expiry)>;
         foreach (var d in rx.Details)
         {
+            var prefix = rxNearExpiry != null && rxNearExpiry.TryGetValue(d.MedicineId, out var p) ? p : (0, null, null);
             <text>
-            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"), @(d.Medicine?.RxRequired == true ? "true" : "false"));
+            addToCart(@d.MedicineId, '@d.Medicine?.Name.Replace("'", "\\'")', @(d.Medicine?.UnitPrice ?? 0), @(d.Medicine?.TotalStock ?? 999), @d.Quantity, @(d.Medicine?.IsVatExempt == true ? "true" : "false"), @(d.Medicine?.RxRequired == true ? "true" : "false"), @prefix.Units, '@prefix.Batch', '@prefix.Expiry');
             </text>
         }
     }
@@ -301,7 +303,7 @@
                 '<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">' +
                 '<span class="fw-bold fs-5 text-success">₱' + price + '</span>' +
                 '<button type="button" class="btn btn-sm ' + (isOutOfStock ? 'btn-secondary' : 'btn-careplus') + ' px-3" ' + (isOutOfStock ? 'disabled' : '') +
-                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ', ' + (med.rxRequired ? 'true' : 'false') + ')">' +
+                ' onclick="addToCart(' + med.id + ', \'' + safeName + '\', ' + med.unitPrice + ', ' + sellableStock + ', 1, ' + (med.isVatExempt ? 'true' : 'false') + ', ' + (med.rxRequired ? 'true' : 'false') + ', ' + (med.nearExpiryUnits || 0) + ', \'' + (med.nearExpiryBatch || '') + '\', \'' + (med.nearExpiryDate || '') + '\')">' +
                 '<i class="bi bi-plus-lg me-1"></i> Add</button>' +
                 '</div>' +
                 '</div>' +
@@ -333,7 +335,7 @@
             '</div>';
     }
 
-    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false, rxRequired = false) {
+    function addToCart(medId, medName, price, maxStock, initialQty = 1, isVatExempt = false, rxRequired = false, nearExpiryUnits = 0, nearExpiryBatch = '', nearExpiryDate = '') {
         const existing = cart.find(i => i.medId === medId);
         if (existing) {
             if (existing.qty + initialQty <= maxStock) {
@@ -343,7 +345,7 @@
             }
         } else {
             if (initialQty <= maxStock) {
-                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt, rxRequired: !!rxRequired });
+                cart.push({ medId, medName, price, maxStock, qty: initialQty, isVatExempt: !!isVatExempt, rxRequired: !!rxRequired, nearExpiryUnits: nearExpiryUnits || 0, nearExpiryBatch: nearExpiryBatch || '', nearExpiryDate: nearExpiryDate || '' });
             } else {
                 alert(`Cannot add. Only ${maxStock} units in stock.`);
             }
@@ -392,11 +394,26 @@
             let html = '';
             cart.forEach(item => {
                 const itemTotal = (item.qty * item.price).toFixed(2);
+
+                // BOGO eligibility indicator only — no pricing is applied here.
+                // FEFO hits near-expiry batches first, so the first N units of this
+                // line come from near-expiry stock.
+                const bogoUnits = Math.min(item.qty, item.nearExpiryUnits || 0);
+                const bogoBadge = bogoUnits > 0
+                    ? '<div class="mt-1"><span class="badge rounded-pill text-bg-warning" style="font-size: 10.5px;">' +
+                      '<i class="bi bi-tag-fill me-1"></i>BOGO Eligible (near expiry)</span>' +
+                      '<span class="text-muted ms-1" style="font-size: 10.5px;">Batch ' + item.nearExpiryBatch +
+                      (item.nearExpiryDate ? ' &middot; exp ' + item.nearExpiryDate : '') +
+                      (bogoUnits < item.qty ? ' &middot; ' + bogoUnits + ' of ' + item.qty + ' units' : '') +
+                      '</span></div>'
+                    : '';
+
                 html += `
                     <div class="pos-item-card">
                         <div style="flex: 1; min-width: 0;">
                             <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${item.medName}</div>
                             <div class="text-muted" style="font-size: 11.5px;">₱${item.price.toFixed(2)} each</div>
+                            ${bogoBadge}
                         </div>
                         <div class="d-flex align-items-center gap-1">
                             <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="changeQty(${item.medId}, -1)">-</button>
