@@ -1,59 +1,5 @@
 # CarePlus Pharmacy ERP & CRM - Implementation Progress
 
-## Current Status
-
-**Near-Expiry "Buy 1 Take 1" (BOGO) promo — COMPLETE (6 of 6 phases).**
-Discounts near-expiring stock out of inventory instead of writing it off. Full detail in
-the BOGO section at the end of this file (global phases 28-33).
-
-| BOGO phase | Scope | Commit |
-|---|---|---|
-| 1 of 6 | `MedicineBatch.IsNearExpiry` + `NearExpiryThresholdDays = 120` | `4f4da50` |
-| 2 of 6 | "Near Expiry (BOGO Eligible)" tab in Expiry Monitor | `e4b5ba5` |
-| 3 of 6 | "BOGO Eligible (near expiry)" badge on POS cart lines | `8b6f334` |
-| 4 of 6 | Server-side BOGO pricing in `SalesController.Checkout` | `57c477f` |
-| 5 of 6 | Receipt/invoice "BOGO applied" lines + `BOGO_APPLIED` audit trail | `a5068a2` |
-| 6 of 6 | Discount-stacking verification + statutory VAT / points-cap fixes | `b75d3cb` |
-
-Docs-only commits: `c5d2bc1`, `9272bb8`, `065b445`.
-
-**How the pricing works (the rule to preserve):** BOGO is a *quantity* discount applied
-per dispensed batch — payable units are `ceil(take / 2)`, and pairing never spans two
-batches. It reduces **gross**, deliberately, *not* `DiscountAmount`, so that any
-percentage discount (Senior/PWD 20%, Membership tier %) then applies to the already-halved
-amount and VAT accrues only on what is actually billed. Canonical check: **4 units of a ₱50
-near-expiry item = ₱100.00, not ₱200.00.**
-
-**Two real bugs found and fixed while verifying** (both are easy to reintroduce):
-- **Senior/PWD VAT overcharge** — `Checkout` left the VAT in the payable total while
-  `Sale.TotalAmount` correctly waived it, so every Senior/PWD sale was billed the VAT that
-  RA 9994 / 9257 / 10754 says not to collect (₱82.14 charged vs ₱71.43 recorded). Both now
-  derive from one shared `payableBeforePoints`.
-- **Points burned for zero discount** — the points cap used `grossTotal − discount`, ignoring
-  both BOGO and the VAT waiver, so it *overstated* what was payable: redeeming 10 points
-  actually consumed 82 and clamped the total to ₱0.00, destroying 10.57 points of loyalty
-  value. Only reachable *because* BOGO lowers the gross. Now capped at the true payable.
-
-**Open items (display-only unless noted):**
-- [ ] **POS subtotal gap — fix before demo.** The on-screen POS summary is built from full
-      line price and so ignores BOGO: a cashier sees ₱200 and collects ₱100 (or sees ₱142.86
-      and collects ₱71.43 on a Senior/PWD BOGO sale). Every server-side figure and both
-      receipts are correct. Fix by having the server return per-line payable figures and
-      rendering those — do **not** reimplement FEFO/batch logic in JavaScript.
-- [ ] Seed data ships with no near-expiry stock, so the promo shows nothing on a fresh DB.
-- [ ] Membership-fee sales show `Gross Total ₱0.00` on their receipt (`GrossAmount` sums
-      `SaleDetails`; membership sales have none). Pre-existing, unrelated to BOGO.
-- [ ] Audit rows 130–142 are orphans referencing Phase 4's deleted test sales. Left
-      deliberately — audit data was not deleted, only the test transactions.
-
-**Working notes:** local MySQL baseline after verification is 90 sales / 90 billings /
-37 medicines / max AuditLog 142. Test rows are staged and purged per phase; do not treat
-staged `ZZTEST*` medicines as real data. Build with `dotnet build` (0 warnings / 0 errors is
-the bar) — but note it only re-compiles Razor when a `.cshtml` actually changed, and it
-fails with a confusing file-lock error if the app is still running.
-
----
-
 ## Phase 1: Remove Hero Banners & Clean Toolbars
 - [x] Views/Home/Index.cshtml (Dashboard banner removed, buttons relocated)
 - [x] Views/Medicines/Expiring.cshtml (Expiry Monitor banner removed, buttons relocated)
@@ -375,3 +321,55 @@ Automatic promo that discounts near-expiring stock out of inventory instead of w
 - [ ] Membership-fee sales show `Gross Total ₱0.00` on their receipt, because `GrossAmount` sums `SaleDetails` and membership sales carry no detail rows. Pre-existing, unrelated to BOGO.
 - [ ] Seed data still ships with no near-expiry stock, so the promo shows nothing on a fresh database.
 - [ ] Audit rows 130–142 are orphans referencing Phase 4's deleted test sales. Left deliberately: audit data was not deleted, only the test transactions.
+
+# Project Status Summary (as of BOGO Phase 6, commit b75d3cb)
+
+**Near-Expiry "Buy 1 Take 1" (BOGO) promo — COMPLETE (6 of 6 phases).**
+Discounts near-expiring stock out of inventory instead of writing it off. Full detail in
+the BOGO section just above (global phases 28-33).
+
+| BOGO phase | Scope | Commit |
+|---|---|---|
+| 1 of 6 | `MedicineBatch.IsNearExpiry` + `NearExpiryThresholdDays = 120` | `4f4da50` |
+| 2 of 6 | "Near Expiry (BOGO Eligible)" tab in Expiry Monitor | `e4b5ba5` |
+| 3 of 6 | "BOGO Eligible (near expiry)" badge on POS cart lines | `8b6f334` |
+| 4 of 6 | Server-side BOGO pricing in `SalesController.Checkout` | `57c477f` |
+| 5 of 6 | Receipt/invoice "BOGO applied" lines + `BOGO_APPLIED` audit trail | `a5068a2` |
+| 6 of 6 | Discount-stacking verification + statutory VAT / points-cap fixes | `b75d3cb` |
+
+Docs-only commits: `c5d2bc1`, `9272bb8`, `065b445`.
+
+**How the pricing works (the rule to preserve):** BOGO is a *quantity* discount applied
+per dispensed batch — payable units are `ceil(take / 2)`, and pairing never spans two
+batches. It reduces **gross**, deliberately, *not* `DiscountAmount`, so that any
+percentage discount (Senior/PWD 20%, Membership tier %) then applies to the already-halved
+amount and VAT accrues only on what is actually billed. Canonical check: **4 units of a ₱50
+near-expiry item = ₱100.00, not ₱200.00.**
+
+**Two real bugs found and fixed while verifying** (both are easy to reintroduce):
+- **Senior/PWD VAT overcharge** — `Checkout` left the VAT in the payable total while
+  `Sale.TotalAmount` correctly waived it, so every Senior/PWD sale was billed the VAT that
+  RA 9994 / 9257 / 10754 says not to collect (₱82.14 charged vs ₱71.43 recorded). Both now
+  derive from one shared `payableBeforePoints`.
+- **Points burned for zero discount** — the points cap used `grossTotal − discount`, ignoring
+  both BOGO and the VAT waiver, so it *overstated* what was payable: redeeming 10 points
+  actually consumed 82 and clamped the total to ₱0.00, destroying 10.57 points of loyalty
+  value. Only reachable *because* BOGO lowers the gross. Now capped at the true payable.
+
+**Open items (display-only unless noted):**
+- [ ] **POS subtotal gap — fix before demo.** The on-screen POS summary is built from full
+      line price and so ignores BOGO: a cashier sees ₱200 and collects ₱100 (or sees ₱142.86
+      and collects ₱71.43 on a Senior/PWD BOGO sale). Every server-side figure and both
+      receipts are correct. Fix by having the server return per-line payable figures and
+      rendering those — do **not** reimplement FEFO/batch logic in JavaScript.
+- [ ] Seed data ships with no near-expiry stock, so the promo shows nothing on a fresh DB.
+- [ ] Membership-fee sales show `Gross Total ₱0.00` on their receipt (`GrossAmount` sums
+      `SaleDetails`; membership sales have none). Pre-existing, unrelated to BOGO.
+- [ ] Audit rows 130–142 are orphans referencing Phase 4's deleted test sales. Left
+      deliberately — audit data was not deleted, only the test transactions.
+
+**Working notes:** local MySQL baseline after verification is 90 sales / 90 billings /
+37 medicines / max AuditLog 142. Test rows are staged and purged per phase; do not treat
+staged `ZZTEST*` medicines as real data. Build with `dotnet build` (0 warnings / 0 errors is
+the bar) — but note it only re-compiles Razor when a `.cshtml` actually changed, and it
+fails with a confusing file-lock error if the app is still running.
